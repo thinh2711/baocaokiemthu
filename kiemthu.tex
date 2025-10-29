@@ -1,0 +1,89 @@
+\documentclass[12pt,a4paper]{report}
+
+\usepackage{fontspec}
+\setmainfont{Times New Roman}
+\defaultfontfeatures{Ligatures=TeX}
+
+\usepackage{polyglossia}
+\setmainlanguage{vietnamese}
+
+\usepackage{geometry}
+\geometry{a4paper, left=3cm, right=2cm, top=2.5cm, bottom=2.5cm}
+
+\usepackage{graphicx}
+
+\usepackage{titlesec}
+\titleformat{\chapter}[hang]
+{\normalfont\huge\bfseries} % kiểu chữ
+{\thechapter.}              % đánh số chương: "1."
+{1em}                       % khoảng cách giữa số và tiêu đề
+{}                          % phần xử lý nội dung phía sau số
+
+\renewcommand{\normalsize}{\large}
+
+\begin{document}
+	
+	\begin{center}
+		{\LARGE \textbf{TRƯỜNG ĐẠI HỌC CÔNG NGHỆ}}\\[6pt]
+		{\LARGE \textbf{KHOA CÔNG NGHỆ THÔNG TIN}}\\[2cm]
+		{\includegraphics[scale=0.5]{logo_HUET.svg.png}}\\[1.5cm]
+		{\Huge \textbf{BÁO CÁO CÔNG CỤ}}\\[6pt]
+		{\Huge \textbf{KIỂM THỬ LOCUST}}\\[20pt]
+		{\Large \textbf{MÔN HỌC: KIỂM THỬ VÀ ĐẢM BẢO}}\\[4pt]
+		{\Large \textbf{CHẤT LƯỢNG PHẦN MỀM}} \\[20pt]
+		{\large \textbf{Giảng viên: } ThS. Nguyễn Thu Trang}\\
+		\vspace{30pt}
+		\begin{tabular}{@{} l l @{}}
+			\large \textbf{Sinh viên 1:} & \large Nguyễn Xuân Thịnh -- 23020709 \\\\
+			\large \textbf{Sinh viên 2:} & \large Hoàng Duy Thịnh -- 23020708 \\\\
+			\large \textbf{Sinh viên 3:} & \large Lê Duy Khánh Toàn -- 23020702 \\\\
+			\large \textbf{Sinh viên 4:} & \large Đặng Đình Khang -- 23020709 \\
+		\end{tabular}\\
+		\vspace{2cm}
+		{\Large \textbf{HÀ NỘI  - 07/2025}}
+	\end{center}
+	\newpage
+	\tableofcontents
+	
+	\newpage	
+	\chapter{Tổng quan}
+	
+	Trong quá trình phát triển phần mềm, kiểm thử phần mềm là một quá trình quan trọng trong việc phát triển phần mềm, nhằm đảm bảo rằng phần mềm hoạt động đúng theo yêu cầu và không có lỗi. Quá trình này bao gồm việc thực hiện các hoạt động kiểm tra để phát hiện và sửa chữa các lỗi trong phần mềm trước khi sản phẩm được phát hành đến người dùng cuối.
+	
+	
+	Công cụ kiểm thử phần mềm chính là trợ thủ đắc lực cho các nhà phát triển trong việc tự động hóa, tối ưu hóa quá trình kiểm tra, tiết kiệm thời gian, chi phí và nâng cao hiệu quả. Công cụ kiểm thử giảm thiểu khả năng xảy ra lỗi do con người, đảm bảo kết quả kiểm thử nhất quán và chính xác hơn; có thể chi phí đầu tư ban đầu cho công cụ kiểm thử cao, nhưng về lâu dài, nó giúp giảm chi phí phát sinh do lỗi phần mềm và các sự cố liên quan.
+	
+	
+	Trong bài báo cáo này, nhóm em tập trung vào công cụ kiểm thử Locust-công cụ kiểm thử hiệu năng được viết bằng Python.
+	
+	\section{Định nghĩa kiểm thử}
+	Kiểm thử phần mềm là quá trình thực hiện các hành động có kế hoạch và có hệ thống để kiểm tra một phần mềm, nhằm xác định chất lượng của phần mềm đó. Mục tiêu của kiểm thử phần mềm là phát hiện lỗi, đảm bảo chất lượng và xác nhận rằng phần mềm đáp ứng các yêu cầu đã đặt ra.
+	
+	\section{Vai trò của kiểm thử}
+	Kiểm thử phần mềm đóng vai trò quan trọng trong việc đánh giá chất lượng và là hoạt động chủ chốt trong việc đảm bảo chất lượng cao của sản phẩm phần mềm trong quá trình phát triển. Thông qua chu trình “kiểm thử -tìm lỗi - sửa lỗi” ta hy vọng chất lượng của sản phẩm phần mềm sẽ được cải tiến. Mặt khác, thông qua việc tiến hành kiểm thử mức
+	hệ thống trước khi cho lưu hành sản phẩm, ta biết được sản phẩm của ta tốt ở mức nào. Vì thế, nhiều tác giả đã mô tả việc kiểm thử phần mềm là một quy trình kiểm chứng để đánh giá và tăng cường chất lượng của sản phẩm phần mềm. [1]  (N. H. Pham, A. H. Truong, and V. H. Dang, in GIÁO TRÌNH KIỂM THỬ PHẦN MỀM, 2014.)
+	
+	\section{Một số thuật ngữ liên quan}
+	
+	\newpage
+	\chapter{Công cụ kiểm thử Locust}
+	\section{Tổng quan}
+	Locust là một công cụ kiểm thử tải mã nguồn mở được viết bằng Python, dùng để đánh giá \textbf{hiệu năng và khả năng chịu tải của hệ thống}. Theo tài liệu chính thức của Locust, công cụ này cho phép người dùng mô phỏng hàng nghìn hoặc hàng triệu người dùng ảo truy cập vào website hoặc API để kiểm tra phản ứng của hệ thống dưới các mức tải khác nhau.
+	
+	Điểm đặc biệt của Locust là cho phép \textbf{viết kịch bản kiểm thử (test scenario)} bằng Python, nhờ đó người kiểm thử có thể mô phỏng hành vi thực tế của người dùng, chẳng hạn như: truy cập trang chủ, đăng nhập, tìm kiếm sản phẩm, thêm vào giỏ hàng hoặc gửi yêu cầu API.
+	
+	Khác với nhiều công cụ truyền thống như JMeter hoặc LoadRunner, Locust \textbf{nhẹ, linh hoạt và dễ mở rộng}, đồng thời có giao diện web trực quan để theo dõi kết quả kiểm thử theo thời gian thực. Ngoài ra, nó hỗ trợ chế độ phân tán (distributed mode), cho phép chạy nhiều worker trên nhiều máy để kiểm thử quy mô lớn.
+	
+	
+	\newpage
+	\chapter{Đánh giá công cụ}
+	
+	\newpage
+	\chapter{So sánh công cụ Locust}
+	
+	\newpage
+	\chapter{Thực nghiệm}
+	
+	\newpage
+	\chapter{Tổng kết}
+\end{document}
