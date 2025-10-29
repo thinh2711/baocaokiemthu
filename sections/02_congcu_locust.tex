@@ -1,0 +1,71 @@
+\chapter{Công cụ kiểm thử Locust}
+\section{Tổng quan}
+Locust là một công cụ kiểm thử tải mã nguồn mở được viết bằng Python, dùng để đánh giá \textbf{hiệu năng và khả năng chịu tải của hệ thống}. Theo \href{https://docs.locust.io/}{\textit{tài liệu chính thức của Locust}}, công cụ này cho phép người dùng mô phỏng hàng nghìn hoặc hàng triệu người dùng ảo truy cập vào website hoặc API để kiểm tra phản ứng của hệ thống dưới các mức tải khác nhau.
+
+Điểm đặc biệt của Locust là cho phép \textbf{viết kịch bản kiểm thử (test scenario)} bằng Python, nhờ đó người kiểm thử có thể mô phỏng hành vi thực tế của người dùng, chẳng hạn như: truy cập trang chủ, đăng nhập, tìm kiếm sản phẩm, thêm vào giỏ hàng hoặc gửi yêu cầu API.
+
+Khác với nhiều công cụ truyền thống như JMeter hoặc LoadRunner, Locust \textbf{nhẹ, linh hoạt và dễ mở rộng}, đồng thời có \textbf{\textbf{giao diện web trực quan}} để theo dõi kết quả kiểm thử theo thời gian thực. Ngoài ra, nó hỗ trợ \textbf{chế độ phân tán (distributed mode)}, cho phép chạy nhiều worker trên nhiều máy để kiểm thử quy mô lớn.
+
+\section{Các tính năng}
+Theo tài liệu chính thức và cộng đồng người dùng Locust, công cụ này sở hữu các nhóm tính năng nổi bật sau:
+
+\subsection{Mô phỏng người dùng thực tế}
+\begin{itemize}[leftmargin=1.5em, itemsep=0.6em]
+	\item Các hành vi của người dùng được định nghĩa thông qua các class kế thừa từ 
+	\textcolor{green}{HttpUser} hoặc \textcolor{blue}{User}.
+	
+	\item Cho phép sử dụng hàm \textcolor{orange}{@task} để xác định hành vi cụ thể và trọng số cho từng tác vụ.
+	
+	\item Mỗi người dùng ảo thực thi các hành vi này theo chu kỳ, mô phỏng hoạt động thực tế của người thật.
+\end{itemize}
+
+\vspace{1em}
+\subsection{Kiểm thử tải và hiệu năng}
+\begin{itemize}[leftmargin=1.5em, itemsep=0.6em]
+	\item Đo \textbf{thời gian phản hồi (response time)}, \textbf{số lượng request/giây}, và \textbf{tỷ lệ lỗi}.
+	\item Giúp phát hiện điểm nghẽn (bottleneck) của hệ thống khi số lượng người dùng tăng dần.
+	\item Hỗ trợ giới hạn tốc độ tải hoặc đặt số lượng người dùng tăng theo thời gian 
+	(\textcolor{green}{spawn\_rate}).
+\end{itemize}
+
+\vspace{1em}
+\subsection{ Giao diện web trực quan}
+
+\begin{itemize}[leftmargin=1.5em, itemsep=0.6em]
+	\item Giao diện tại địa chỉ 
+	\textcolor{teal}{\href{http://localhost:8089}{http://localhost:8089}} 
+	giúp điều chỉnh số người dùng, tốc độ sinh người dùng, và quan sát kết quả kiểm thử theo thời gian thực.
+	\item Hiển thị thống kê như trung bình thời gian phản hồi, phần trăm lỗi, độ lệch chuẩn, và phân phối phần trăm phản hồi (percentiles).
+\end{itemize}
+
+\vspace{1em}
+\subsection{ Chạy phân tán}
+
+\begin{itemize}[leftmargin=1.5em, itemsep=0.6em]
+	\item Cho phép chạy theo mô hình \textbf{Master-Worker}, trong đó Master điều phối và tổng hợp kết quả từ nhiều Worker.
+	\item Hữu ích khi cần kiểm thử hệ thống quy mô lớn với hàng trăm nghìn người dùng ảo.
+\end{itemize}
+
+\vspace{1em}
+\subsection{ Tích hợp và mở rộng}
+
+\begin{itemize}[leftmargin=1.5em, itemsep=0.6em]
+	\item Dễ dàng tích hợp vào pipeline CI/CD (Jenkins, GitHub Actions, GitLab CI).
+	\item Có thể ghi log, xuất kết quả sang CSV hoặc gửi đến hệ thống giám sát như Grafana, Prometheus, InfluxDB.
+	\item Hỗ trợ kiểm thử không chỉ HTTP mà còn WebSocket, MQTT, gRPC, và các giao thức tuỳ chỉnh thông qua lớp \textcolor{blue}{User}.
+\end{itemize}
+
+\section{Mục tiêu}
+Các mục tiêu chính của việc sử dụng Locust trong kiểm thử phần mềm bao gồm:
+\begin{itemize}[leftmargin=1.5em, itemsep=0.6em]
+	\item \textbf{Đánh giá hiệu năng hệ thống:} Xác định khả năng chịu tải của hệ thống, tốc độ phản hồi và độ ổn định khi có nhiều người dùng đồng thời.
+	
+	\item \textbf{Phát hiện điểm nghẽn (bottlenecks):} Xác định thành phần gây ra độ trễ, như cơ sở dữ liệu, API chậm, hoặc quá tải CPU.
+	
+	\item \textbf{Tối ưu hóa tài nguyên:} Dựa trên kết quả kiểm thử, nhóm phát triển có thể tối ưu kiến trúc, cân bằng tải, hoặc nâng cấp phần cứng.
+	
+	\item \textbf{Đảm bảo độ tin cậy:} Kiểm thử khả năng phục hồi (resilience) và hành vi hệ thống trong các tình huống cực đoan.
+	
+	\item \textbf{Tự động hóa kiểm thử:} Tích hợp Locust vào quy trình CI/CD giúp đảm bảo hệ thống luôn duy trì hiệu năng ổn định qua các bản phát hành.
+	
+\end{itemize}

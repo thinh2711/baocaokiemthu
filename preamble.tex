@@ -1,0 +1,31 @@
+\usepackage{fontspec}
+\setmainfont{Times New Roman}
+\defaultfontfeatures{Ligatures=TeX}
+
+\usepackage{polyglossia}
+\setmainlanguage{vietnamese}
+
+\usepackage{geometry}
+\geometry{a4paper, left=3cm, right=2cm, top=2.5cm, bottom=2.5cm}
+
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{enumitem}
+
+
+\usepackage{titlesec}
+\titleformat{\chapter}[hang]
+{\normalfont\huge\bfseries} % kiểu chữ
+{\thechapter.}              % đánh số chương: "1."
+{1em}                       % khoảng cách giữa số và tiêu đề
+{}                          % phần xử lý nội dung phía sau số
+
+\renewcommand{\normalsize}{\large}
+
+\usepackage[
+colorlinks=true,
+linkcolor=black,     % mục lục giữ màu đen
+urlcolor=blue,       % link ngoài có màu xanh
+citecolor=black,     % citation giữ màu đen
+pdfborder={0 0 1}    % gạch chân link ngoài
+]{hyperref}
