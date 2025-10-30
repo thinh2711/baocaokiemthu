@@ -1,0 +1,46 @@
+\section{Chi tiết hoạt động của LOCUST}
+\subsection{Định nghĩa người dùng và tác vụ}
+
+Bắt đầu từ cốt lõi: mô tả ``người dùng ảo'' sẽ làm gì. Khi hành vi được khai báo rõ, mọi thứ tiếp theo (dữ liệu, kịch bản, tải) mới có nền tảng để triển khai.
+
+\begin{itemize}
+	\item \textbf{Lớp người dùng ảo (\texttt{HttpUser})}: Locust mô phỏng người dùng thông qua việc định nghĩa các lớp Python kế thừa \texttt{\textcolor{teal}{HttpUser}} (hoặc \textcolor{teal}{User} nếu không dùng HTTP). \textcolor{teal}{HttpUser} cung cấp client HTTP tích hợp sẵn để gửi requests đến hệ thống đích. Mỗi instance của \textcolor{teal}{HttpUser} đại diện cho một người dùng ảo độc lập với session riêng, thực hiện một tập hành vi cụ thể trên hệ thống.
+	
+	\item \textcolor{teal}{@task} \textbf{decorator – Định nghĩa tác vụ bằng \textcolor{teal}{@task}}: Bên trong lớp \textcolor{teal}{HttpUser}, các hành vi (scenario) của người dùng được định nghĩa dưới dạng các phương thức được đánh dấu bằng decorator \textcolor{teal}{@task}. Mỗi phương thức được trang trí bởi \textcolor{teal}{@task} được coi là một \textit{tác vụ} mà người dùng ảo sẽ thực hiện. Locust sẽ tạo nhiều instance của lớp người dùng và mỗi instance chọn ngẫu nhiên một tác vụ để chạy tại mỗi bước.
+	
+	\item \textbf{Trọng số task (task weight)}: Có thể gán trọng số cho tác vụ bằng cách truyền tham số vào \textcolor{teal}{@task}, ví dụ \textcolor{teal}{@task(3)}. Tác vụ có trọng số cao sẽ được chọn thực thi thường xuyên hơn (ví dụ trọng số 3 nghĩa là xác suất chạy tác vụ đó cao gấp \textasciitilde3 lần so với trọng số 1). Bên trong phương thức tác vụ, sử dụng \textcolor{teal}{self.client} (HTTP client tích hợp) để gửi các yêu cầu HTTP (GET, POST, ...); Locust sẽ tự động thu thập thời gian thực thi và kết quả (status code, độ trễ, ...) của các request này.
+	
+	\item \textcolor{teal}{wait\_time}: Định nghĩa thời gian chờ giữa các task để mô phỏng hành vi người dùng thực. Có thể sử dụng \textcolor{teal}{constant} (cố định), \textcolor{teal}{between} (ngẫu nhiên trong khoảng), hoặc \textcolor{teal}{constant\_pacing} (đảm bảo tần suất đều).
+	
+	\item \textbf{Hooks on\_start/on\_stop}: Có thể định nghĩa các phương thức đặc biệt \textcolor{teal}{on\_start(self)} và \textcolor{teal}{on\_stop(self)} trong lớp người dùng. \textcolor{teal}{on\_start} sẽ được Locust gọi \textbf{một lần} khi mỗi user ảo bắt đầu phiên chạy của nó -- thường dùng để thực hiện bước khởi tạo, ví dụ đăng nhập hoặc thiết lập dữ liệu ban đầu. Tương tự, \textcolor{teal}{on\_stop} được gọi khi người dùng ảo kết thúc (khi test dừng hoặc người dùng bị loại bỏ), thường dùng để dọn dẹp, ví dụ đăng xuất hoặc giải phóng tài nguyên. Các hook này giúp mô phỏng chính xác hơn vòng đời của một phiên người dùng.
+	
+	\item \textbf{Stateful flow}: Cho phép duy trì trạng thái qua các request như session cookies, authentication tokens, hoặc dữ liệu context. Điều này quan trọng để mô phỏng luồng giao dịch liên tiếp của người dùng thực.
+\end{itemize}
+
+\vspace{0.5em}
+\noindent\textbf{Đoạn code Python dưới đây định nghĩa một lớp người dùng ảo với hai tác vụ đơn giản, sử dụng trọng số, thời gian chờ và hook \texttt{on\_start}/\texttt{on\_stop}:}
+\vspace{0.5em}
+
+\begin{lstlisting}
+	from locust import HttpUser, task, between
+	
+	class WebsiteUser(HttpUser):
+	wait_time = between(1, 5)
+	
+	def on_start(self):
+	self.client.post("/login", json={"username": "test", "password": "test"})
+	
+	def on_stop(self):
+	self.client.post("/logout")
+	
+	@task(3)
+	def view_home(self):
+	self.client.get("/")
+	
+	@task(1)
+	def view_profile(self):
+	self.client.get("/profile")
+\end{lstlisting}
+
+
+

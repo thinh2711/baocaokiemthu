@@ -8,10 +8,13 @@
 \usepackage{geometry}
 \geometry{a4paper, left=3cm, right=2cm, top=2.5cm, bottom=2.5cm}
 
+\usepackage{fancyvrb}
+\usepackage{color}
+
 \usepackage{graphicx}
 \usepackage{xcolor}
 \usepackage{enumitem}
-
+\usepackage{float}
 
 \usepackage{titlesec}
 \titleformat{\chapter}[hang]
@@ -29,3 +32,21 @@ urlcolor=blue,       % link ngoài có màu xanh
 citecolor=black,     % citation giữ màu đen
 pdfborder={0 0 1}    % gạch chân link ngoài
 ]{hyperref}
+
+\usepackage{listings}
+
+\lstset{
+	basicstyle=\ttfamily\footnotesize,
+	breaklines=true,
+	frame=single,
+	backgroundcolor=\color{gray!10},
+	keywordstyle=\color{blue},
+	commentstyle=\color{green!50!black},
+	stringstyle=\color{red},
+	showstringspaces=false,
+	language=Python,
+	numbers=left,
+	numberstyle=\tiny\color{gray}
+}
+
+
