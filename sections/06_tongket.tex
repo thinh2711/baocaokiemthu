@@ -1,0 +1,56 @@
+\chapter{Kết luận}
+
+\section{Ưu điểm}
+
+Locust sở hữu nhiều ưu điểm vượt trội, giúp nó trở thành một lựa chọn hàng đầu cho các đội ngũ phát triển hiện đại trong kiểm thử hiệu năng:
+
+\begin{itemize}
+    \item \textbf{Triết lý ``Tests-as-Code'' với Python:} Đây là thế mạnh lớn nhất của Locust. Kịch bản kiểm thử được viết hoàn toàn bằng Python, cho phép sử dụng biến, vòng lặp, xác thực logic phức tạp và toàn bộ hệ sinh thái thư viện Python. Điều này giúp dễ dàng bảo trì, dùng Git để quản lý phiên bản và hỗ trợ code review như một phần của quy trình phát triển phần mềm.
+    
+    \item \textbf{Hiệu quả tài nguyên và hiệu năng cao:} Locust sử dụng kiến trúc xử lý đồng thời dựa trên sự kiện với \textit{gevent} và \textit{greenlets}. Không cần tạo một luồng hệ điều hành cho mỗi người dùng mô phỏng, Locust có thể tạo hàng ngàn người dùng trong một tiến trình duy nhất, giảm đáng kể chi phí CPU và bộ nhớ so với các công cụ truyền thống.
+    
+    \item \textbf{Khả năng mở rộng quy mô vượt trội:} Với mô hình \textit{master–worker}, Locust dễ dàng mở rộng kiểm thử sang nhiều máy khác nhau, mô phỏng hàng trăm nghìn đến hàng triệu người dùng. Điều này phù hợp với kiểm thử phân tán cho các hệ thống quy mô lớn.
+    
+    \item \textbf{Tích hợp tốt vào DevOps / CI/CD:} Vì kiểm thử được viết bằng mã nguồn, Locust dễ tích hợp vào GitLab CI, GitHub Actions, Jenkins, Azure DevOps,... Có thể chạy kiểm thử tự động ở chế độ không giao diện (headless), hỗ trợ văn hoá \textit{shift-left}, kiểm thử hiệu năng sớm và liên tục.
+    
+    \item \textbf{Giao diện Web trực quan, thời gian thực:} Locust cung cấp Web UI hiển thị số lượng người dùng, số yêu cầu mỗi giây, thời gian phản hồi và tỷ lệ lỗi theo thời gian thực. Người dùng có thể tăng/giảm tải ngay khi kiểm thử đang chạy.
+\end{itemize}
+
+\noindent
+Những ưu điểm trên khiến Locust trở thành một lựa chọn mạnh mẽ cho các đội ngũ chú trọng tự động hóa, linh hoạt và khả năng mở rộng trong kiểm thử hiệu năng.
+
+\section{Nhược điểm}
+
+Mặc dù có nhiều ưu điểm, Locust cũng tồn tại một số hạn chế cần cân nhắc:
+
+\begin{itemize}
+    \item \textbf{Yêu cầu kỹ năng lập trình:} Triết lý ``tests-as-code'' buộc người dùng phải biết Python. Những kiểm thử viên quen với công cụ có giao diện đồ họa như JMeter có thể gặp khó khăn. Locust cũng không cung cấp \textit{script recorder} mặc định, mọi kịch bản đều phải viết thủ công.
+    
+    \item \textbf{Báo cáo tích hợp còn hạn chế:} Web UI mạnh trong thời gian thực nhưng báo cáo hậu kiểm còn đơn giản so với JMeter hoặc Gatling. Để quan sát, lưu trữ và phân tích dài hạn, người dùng cần tích hợp thêm Prometheus, InfluxDB hoặc Grafana.
+    
+    \item \textbf{Hỗ trợ giao thức mặc định hạn chế:} Locust chủ yếu hỗ trợ HTTP/HTTPS. Muốn kiểm thử các giao thức khác như gRPC, MQTT, WebSocket hoặc JDBC cần viết thêm client tùy chỉnh bằng Python → tốn công và đòi hỏi kỹ thuật cao.
+    
+    \item \textbf{Hạn chế khi xử lý tác vụ nặng CPU:} Vì sử dụng mô hình event-driven, Locust tối ưu cho tác vụ I/O. Nếu script chứa tính toán nặng, chúng có thể làm chậm event-loop và gây hiện tượng \textit{greenlet starvation}.
+\end{itemize}
+
+Dù tồn tại hạn chế, Locust vẫn là một công cụ kiểm thử hiệu năng mạnh mẽ khi được áp dụng đúng bối cảnh, đặc biệt với các dự án theo hướng DevOps, lập trình Python và yêu cầu tự động hóa cao.
+
+\section{Nguồn trích dẫn}
+
+\begin{thebibliography}{99}
+\bibitem{simpleprogrammer} Simple Programmer, ``What's Load Testing and How Does a Locust Framework Help?'', truy cập 15/10/2025.
+\bibitem{checkops} CheckOps, ``Locust'', truy cập 15/10/2025.
+\bibitem{browserstack} BrowserStack, ``JMeter Distributed Testing: Tutorial'', truy cập 08/10/2025.
+\bibitem{locustdocs} Locust Official Documentation, ``What is Locust?'', truy cập 15/10/2025, \url{https://docs.locust.io}.
+\bibitem{mediumazure} Heyko Oelrichs, ``Globally Distributed Load Tests in Azure with Locust'', Medium, truy cập 15/10/2025.
+\bibitem{maddevs} Mad Devs, ``How to Create and Run Your First Performance Test With Locust'', truy cập 15/10/2025.
+\bibitem{github} Locust GitHub Repository, \url{https://github.com/locustio/locust}.
+\bibitem{frugal} Frugal Testing, ``Locust for Load Testing: A Beginner's Guide'', truy cập 15/10/2025.
+\bibitem{linode} Linode Docs, ``How to Load Test Your Applications with Locust'', truy cập 08/10/2025.
+\bibitem{softwaremag} Software Testing Magazine, ``Learning Locust: Documentation, Tutorials, Videos'', truy cập 08/10/2025.
+\bibitem{loadium} Loadium, ``What is Locust Load Testing?'', truy cập 08/10/2025.
+\bibitem{pflb} PFLB, ``JMeter vs. Locust: Which One To Choose?'', truy cập 15/10/2025.
+\bibitem{upsun} Upsun, ``Python Gevent in practice: common pitfalls'', truy cập 15/10/2025.
+\bibitem{blazemeter} BlazeMeter, ``Gatling vs. Locust'', truy cập 15/10/2025.
+\bibitem{jtlreport} JtlReporter, ``How to Analyze Locust.io Report'', truy cập 15/10/2025.
+\end{thebibliography}

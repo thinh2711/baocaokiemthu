@@ -1,0 +1,92 @@
+% Phần 4: So sánh Locust với các công cụ kiểm thử hiệu năng tương tự
+
+\section{Giới thiệu chung về Locust}
+
+Nền tảng kiến trúc của Locust dựa trên cơ chế xử lý đồng thời điều khiển bằng sự kiện (event-driven), sử dụng các coroutine cực nhẹ gọi là greenlet. Điều này cho phép một máy duy nhất có thể mô phỏng hàng ngàn người dùng đồng thời mà không tiêu tốn nhiều tài nguyên, một ưu điểm lớn so với các công cụ dựa trên luồng truyền thống. Để đánh giá đúng vị thế của Locust, nhóm em sẽ so sánh trực tiếp nó với ba công cụ phổ biến khác trong ngành: Apache JMeter, K6, và Gatling.
+
+\section{So sánh chi tiết}
+
+\subsection{Locust vs. Apache JMeter}
+
+Apache JMeter là một trong những công cụ kiểm thử hiệu năng lâu đời và phổ biến nhất, nổi bật với giao diện đồ họa (GUI) trực quan cho phép người dùng xây dựng kịch bản mà không cần viết nhiều mã. Cuộc đối đầu giữa Locust và JMeter là sự so sánh giữa một bên là ``tests-as-code'' linh hoạt cho nhà phát triển và một bên là ``GUI-driven'' dễ tiếp cận cho người không chuyên về lập trình.
+
+\begin{center}
+\textbf{Bảng 4.1: So sánh Locust và Apache JMeter}
+\end{center}
+
+\vspace{2mm}
+
+\noindent
+\begin{tabularx}{\textwidth}{|>{\RaggedRight\arraybackslash}p{3.2cm}|X|X|}
+\hline
+\textbf{Đặc điểm} & \textbf{Locust} & \textbf{Apache JMeter} \\ \hline
+Ngôn ngữ chính & Python & Java (với Groovy/BeanShell) \\ \hline
+Mô hình cốt lõi & Tests-as-Code & Kế hoạch kiểm thử qua GUI \\ \hline
+Mô hình đồng thời & Dựa trên sự kiện (Greenlets) & Mỗi luồng một người dùng \\ \hline
+Giao diện chính & Web UI \& Dòng lệnh (CLI) & Giao diện đồ họa (GUI) \& CLI \\ \hline
+Báo cáo & Web UI thời gian thực & Báo cáo HTML chi tiết sau kiểm thử \\ \hline
+Điểm mạnh chính & Linh hoạt, hiệu quả tài nguyên, dễ tích hợp CI/CD & Hỗ trợ nhiều giao thức, cộng đồng lớn, dễ bắt đầu không cần code \\ \hline
+\end{tabularx}
+\vspace{4mm}
+
+\textbf{Nhận xét:} Sự khác biệt lớn nhất nằm ở kiến trúc. Mô hình "mỗi luồng một người dùng" của JMeter tiêu tốn nhiều tài nguyên hơn đáng kể so với mô hình dựa trên sự kiện của Locust. Do đó, Locust có khả năng mô phỏng số 	lượng người dùng đồng thời lớn hơn nhiều trên cùng một phần cứng. JMeter phù hợp cho các đội ngũ QA truyền thống hoặc khi cần kiểm thử các giao thức đa dạng ngoài HTTP (như JDBC, FTP). Ngược lại, Locust là lựa chọn vượt trội cho các đội ngũ phát triển theo định hướng DevOps, ưu tiên tự động hóa, quản lý phiên bản kịch bản kiểm thử và yêu cầu hiệu năng cao.
+
+\vspace{4mm}
+\subsection{Locust vs. K6}
+
+K6 là một công cụ kiểm thử hiệu năng hiện đại khác, cũng theo triết lý ``tests-as-code'' tương tự Locust. Tuy nhiên, K6 được xây dựng bằng Go và sử dụng JavaScript để viết kịch bản, nhắm đến cộng đồng phát triển web rộng lớn. Locust và K6 là hai công cụ cùng thế hệ, có chung triết lý nhưng khác biệt về hệ sinh thái công nghệ.
+
+\begin{center}
+\textbf{Bảng 4.2: So sánh Locust và K6}
+\end{center}
+
+\vspace{2mm}
+
+\noindent
+\begin{tabularx}{\textwidth}{|>{\RaggedRight\arraybackslash}p{3.2cm}|X|X|}
+\hline
+\textbf{Đặc điểm} & \textbf{Locust} & \textbf{K6} \\ \hline
+Ngôn ngữ chính & Python & JavaScript (chạy trong Go runtime) \\ \hline
+Mô hình cốt lõi & Tests-as-Code & Tests-as-Code \\ \hline
+Mô hình đồng thời & Dựa trên sự kiện (Greenlets) & Dựa trên sự kiện (Goroutines) \\ \hline
+Giao diện chính & Web UI \& Dòng lệnh (CLI) & Ưu tiên Dòng lệnh (CLI) \\ \hline
+Phong cách báo cáo & Web UI thời gian thực & CLI trực tiếp, tích hợp tốt với Grafana/Datadog \\ \hline
+Điểm mạnh chính & Hệ sinh thái Python mạnh mẽ, kịch bản linh hoạt & Hiệu năng thực thi cao, tích hợp sâu với hệ sinh thái Grafana \\ \hline
+\end{tabularx}
+\vspace{4mm}
+
+\textbf{Nhận xét:} Cả Locust và K6 đều có kiến trúc dựa trên sự kiện hiệu quả, giúp chúng vượt trội hơn JMeter về mặt sử dụng tài nguyên. Sự lựa chọn giữa hai công cụ này thường phụ thuộc vào kỹ năng và hệ sinh thái của đội ngũ phát triển. K6 là lựa chọn tốt cho các nhóm làm việc chủ yếu với JavaScript/TypeScript và đã đầu tư vào hạ tầng giám sát với Grafana. Ngược lại, Locust hấp dẫn hơn đối với các đội ngũ backend Python, kỹ sư SRE, hoặc khi kịch bản kiểm thử đòi hỏi logic phức tạp cần đến sức mạnh của các thư viện Python phong phú.
+
+\vspace{4mm}
+\subsection{Locust vs. Gatling}
+
+Gatling là một công cụ hiệu năng cao, được xây dựng trên nền tảng JVM (sử dụng Scala) và cũng áp dụng kiến trúc bất đồng bộ dựa trên sự kiện. Giống như Locust và K6, Gatling là một công cụ ``tests-as-code'' nhưng sử dụng một Ngôn ngữ Đặc tả Miền (DSL) riêng. So sánh Locust và Gatling cho thấy sự đánh đổi giữa hiệu năng thô của JVM và tính dễ sử dụng, linh hoạt của Python.
+
+\begin{center}
+\textbf{Bảng 4.3: So sánh Locust và Gatling}
+\end{center}
+
+\vspace{2mm}
+
+\noindent
+\begin{tabularx}{\textwidth}{|>{\RaggedRight\arraybackslash}p{3.2cm}|X|X|}
+\hline
+\textbf{Đặc điểm} & \textbf{Locust} & \textbf{Gatling} \\ \hline
+Ngôn ngữ chính & Python & Scala / Java / Kotlin \\ \hline
+Mô hình cốt lõi & Tests-as-Code & Tests-as-Code (thông qua DSL) \\ \hline
+Mô hình đồng thời & Dựa trên sự kiện (Greenlets) & Bất đồng bộ dựa trên Actor (Akka) \\ \hline
+Giao diện chính & Web UI \& Dòng lệnh (CLI) & Recorder \& Dòng lệnh (CLI) \\ \hline
+Phong cách báo cáo & Web UI thời gian thực & Báo cáo HTML chi tiết, trực quan sau kiểm thử \\ \hline
+Điểm mạnh chính & Dễ học, linh hoạt, cộng đồng Python lớn & Hiệu năng rất cao trên JVM, báo cáo đẹp mắt \\ \hline
+\end{tabularx}
+\vspace{4mm}
+
+\textbf{Nhận xét:} Gatling thường được đánh giá cao về hiệu năng thực thi và khả năng sinh ra các báo cáo HTML tĩnh rất chi tiết và đẹp mắt. Tuy nhiên, việc sử dụng Scala và DSL riêng có thể tạo ra rào cản học tập đối với các nhóm không quen thuộc với hệ sinh thái JVM. Ngược lại, Locust thân thiện hơn với nhà phát triển nhờ Python, dễ tùy biến và tích hợp linh hoạt. Mặc dù hiệu năng xử lý CPU thuần của Python không thể so sánh với JVM, nhưng kiến trúc event-driven giúp Locust vẫn cực kỳ hiệu quả cho các bài kiểm thử tải bị giới hạn bởi I/O. Vì vậy, Locust là một lựa chọn cân bằng tốt giữa hiệu suất, độ linh hoạt và trải nghiệm phát triển.
+
+
+\vspace{4mm}
+
+
+\section{Kết luận}
+
+Locust đã khẳng định vị thế là một công cụ kiểm thử hiệu năng hàng đầu cho các đội ngũ kỹ thuật hiện đại. Bằng cách trao quyền cho các nhà phát triển viết kịch bản kiểm thử bằng Python, nó không chỉ mang lại sự linh hoạt vô song mà còn tích hợp kiểm thử hiệu năng một cách tự nhiên vào vòng đời phát triển phần mềm. So với các công cụ truyền thống như JMeter, Locust vượt trội về hiệu quả sử dụng tài nguyên và phù hợp hơn với văn hóa DevOps. So với các đối thủ hiện đại như K6 và Gatling, Locust mang đến một sự cân bằng hấp dẫn giữa tính dễ sử dụng, sức mạnh của hệ sinh thái thư viện và hiệu suất mạnh mẽ, biến nó thành lựa chọn chiến lược cho nhiều bối cảnh phát triển khác nhau.
