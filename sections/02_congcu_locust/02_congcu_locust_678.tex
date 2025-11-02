@@ -1,0 +1,61 @@
+\section{Các lỗi có thể phát hiện}
+
+Thông qua kiểm thử tải và hiệu năng, Locust giúp phát hiện nhiều loại lỗi tiềm ẩn trong hệ thống:
+
+\begin{enumerate}
+	\item \textbf{Lỗi hiệu năng:}
+	\begin{itemize}
+		\item Ứng dụng phản hồi chậm khi lượng người dùng tăng.
+		\item Request timeout do server không đáp ứng kịp.
+		\item Hiệu suất giảm mạnh ở các điểm tải cao.
+	\end{itemize}
+	
+	\item \textbf{Lỗi máy chủ (Server-side errors):}
+	\begin{itemize}
+		\item Phản hồi HTTP 5xx (\textit{Internal Server Error, Gateway Timeout, Service Unavailable}).
+		\item Lỗi xử lý logic hoặc truy vấn cơ sở dữ liệu dưới tải lớn.
+	\end{itemize}
+	
+	\item \textbf{Lỗi ứng dụng (Application-level bugs):}
+	\begin{itemize}
+		\item Trạng thái phiên (session) không nhất quán.
+		\item Mất dữ liệu hoặc phản hồi sai khi nhiều người dùng thao tác đồng thời.
+	\end{itemize}
+	
+	\item \textbf{Lỗi cấu hình hạ tầng:}
+	\begin{itemize}
+		\item Giới hạn kết nối mạng, thread pool, hoặc thiếu tài nguyên RAM/CPU.
+	\end{itemize}
+\end{enumerate}
+
+Các lỗi này thường chỉ xuất hiện trong điều kiện tải thực tế, vì vậy Locust đóng vai trò quan trọng trong việc tái hiện và phân tích hành vi hệ thống trước khi triển khai thật.
+
+% -------------------------------------------------------
+\section{Ví dụ cấu hình kiểm thử}
+
+Một ví dụ đơn giản về kiểm thử tải một website với Locust:
+
+\begin{lstlisting}[language=Python, 
+	caption={Ví dụ kiểm thử tải website bằng Locust}, 
+	label={lst:locust-example}, 
+	breaklines=true]
+	from locust import HttpUser, task, between
+	
+	class WebsiteUser(HttpUser):
+	wait_time = between(1, 3)  # Thời gian chờ giữa các tác vụ (giả lập người dùng thật)
+	
+	@task(2)
+	def view_homepage(self):
+	self.client.get("/")  # Truy cập trang chủ
+	
+	@task(1)
+	def view_product(self):
+	self.client.get("/product/1")  # Xem chi tiết sản phẩm
+\end{lstlisting}
+
+\noindent \textbf{Chạy kiểm thử:}
+\begin{lstlisting}[language=bash]
+	locust -f locustfile.py --host=https://example.com
+\end{lstlisting}
+
+Sau khi chạy, mở trình duyệt và truy cập \textcolor{teal}{http://localhost:8089} để cấu hình số người dùng và tốc độ sinh người dùng.

@@ -34,6 +34,7 @@ pdfborder={0 0 1}    % gạch chân link ngoài
 ]{hyperref}
 
 \usepackage{listings}
+\renewcommand{\lstlistingname}{Ví dụ}
 
 \lstset{
 	basicstyle=\ttfamily\footnotesize,
@@ -48,5 +49,19 @@ pdfborder={0 0 1}    % gạch chân link ngoài
 	numbers=left,
 	numberstyle=\tiny\color{gray}
 }
+
+% Định nghĩa ngôn ngữ YAML cho listings
+\lstdefinelanguage{yaml}{
+	keywords={true,false,null,y,n},
+	keywordstyle=\color{blue}\bfseries,
+	basicstyle=\ttfamily\small,
+	sensitive=false,
+	comment=[l]{\#},
+	morecomment=[l]{\#},
+	morestring=[b]",
+	morestring=[b]'
+}
+
+\usepackage[normalem]{ulem}
 
 

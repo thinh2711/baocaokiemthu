@@ -1,0 +1,38 @@
+\chapter{Đánh giá công cụ}
+
+\section*{(Phần 3 trong bố cục) Đánh giá công cụ}
+\subsection*{1.1 Kiểm thử hộp đen}
+
+Sau khi tham khảo một số bài báo khoa học, nhóm em đã tìm được các thí nghiệm thực hiện việc so sánh hiệu năng của các công cụ kiểm thử tải (load testing tools) như là \textbf{JMeter}, \textbf{Locust}, \textbf{Gatling}, \textbf{k6}, \textbf{Taurus}, \textbf{OMEXUS} (\textit{công cụ kiểm thử tại nội bộ}).
+
+Mỗi công cụ sẽ gửi yêu cầu nhanh nhất có thể, và các dữ liệu về \textbf{thời gian phản hồi trung bình (Average Response Time)}, \textbf{lưu lượng xử lý (Throughput)} và \textbf{dung lượng bộ nhớ sử dụng (Memory usage)} sẽ được ghi lại, sau đó được sử dụng để thực hiện các phép so sánh cơ bản.
+
+\begin{itemize}
+	\item \textbf{Thí nghiệm 1:} Tạo ra \textbf{20 giao dịch đồng thời với 5000 vòng lặp} hướng đến môi trường sản xuất. Vòng lặp này chỉ bao gồm 1 yêu cầu HTTP duy nhất.
+\end{itemize}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.8\textwidth]{figures/3_1.png} % Sửa tên file ảnh nếu khác
+	\caption{Throughput comparison in the production environment}
+\end{figure}
+
+\noindent\textbf{Kết quả:} \textbf{JMeter}, \textbf{Locust}, và \textbf{Gatling} đều đạt được \textbf{thông lượng rất cao} và tương đương nhau. Tuy nhiên, để đạt được thông lượng cao đó, \textbf{Locust vẫn là công cụ sử dụng ít bộ nhớ nhất} (0.22~GiB), hiệu quả hơn nhiều so với \textbf{Gatling} (0.51~GiB) và \textbf{JMeter} (0.7~GiB).
+
+\vpsace{0.5em}
+\begin{itemize}
+	\item \textbf{Thí nghiệm 2:} Tạo ra \textbf{200 giao dịch đồng thời và 50 vòng lặp}, hướng đến \textbf{môi trường Docker}.
+	\begin{itemize}
+		\item Kịch bản “First”: Một bài test \textbf{đơn giản}, chỉ bao gồm các yêu cầu HTTP thuần túy.
+		\item Kịch bản “Second”: Một bài test \textbf{phức tạp} hơn, kết hợp nhiều giao thức khác nhau (ví dụ: HTTP và JDBC).
+	\end{itemize}
+\end{itemize}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.85\textwidth]{example-throughput-docker.png} % Đổi tên hình cho phù hợp
+	\caption{Throughput vs. memory on the docker environment}
+\end{figure}
+
+\noindent\textbf{Kết quả:} \textbf{JMeter} đạt được \textbf{Average RPS cao nhất} trong bài test đơn giản, hiệu suất giảm nhẹ đối với bài test phức tạp và cũng tiêu tốn nhiều bộ nhớ nhất. Trong khi đó, \textbf{Gatling} cho thấy \textbf{sự ổn định rất cao} khi hiệu suất và mức sử dụng bộ nhớ gần như không thay đổi giữa hai bài test đơn giản và phức tạp. Ngược lại, dù đạt được Average RPS rất cao, gần bằng JMeter trong bài test đơn giản với mức sử dụng bộ nhớ rất thấp, nhưng khi sang bài test phức tạp, hiệu suất của \textbf{Locust} đã \textbf{giảm đáng kể và mức tiêu hao bộ nhớ cũng tăng nhiều}.
+
