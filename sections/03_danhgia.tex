@@ -19,7 +19,6 @@ Mỗi công cụ sẽ gửi yêu cầu nhanh nhất có thể, và các dữ li�
 
 \noindent\textbf{Kết quả:} \textbf{JMeter}, \textbf{Locust}, và \textbf{Gatling} đều đạt được \textbf{thông lượng rất cao} và tương đương nhau. Tuy nhiên, để đạt được thông lượng cao đó, \textbf{Locust vẫn là công cụ sử dụng ít bộ nhớ nhất} (0.22~GiB), hiệu quả hơn nhiều so với \textbf{Gatling} (0.51~GiB) và \textbf{JMeter} (0.7~GiB).
 
-\vpsace{0.5em}
 \begin{itemize}
 	\item \textbf{Thí nghiệm 2:} Tạo ra \textbf{200 giao dịch đồng thời và 50 vòng lặp}, hướng đến \textbf{môi trường Docker}.
 	\begin{itemize}
@@ -30,9 +29,125 @@ Mỗi công cụ sẽ gửi yêu cầu nhanh nhất có thể, và các dữ li�
 
 \begin{figure}[H]
 	\centering
-	\includegraphics[width=0.85\textwidth]{example-throughput-docker.png} % Đổi tên hình cho phù hợp
+	\includegraphics[width=0.85\textwidth]{figures/3_2.png}
 	\caption{Throughput vs. memory on the docker environment}
 \end{figure}
 
 \noindent\textbf{Kết quả:} \textbf{JMeter} đạt được \textbf{Average RPS cao nhất} trong bài test đơn giản, hiệu suất giảm nhẹ đối với bài test phức tạp và cũng tiêu tốn nhiều bộ nhớ nhất. Trong khi đó, \textbf{Gatling} cho thấy \textbf{sự ổn định rất cao} khi hiệu suất và mức sử dụng bộ nhớ gần như không thay đổi giữa hai bài test đơn giản và phức tạp. Ngược lại, dù đạt được Average RPS rất cao, gần bằng JMeter trong bài test đơn giản với mức sử dụng bộ nhớ rất thấp, nhưng khi sang bài test phức tạp, hiệu suất của \textbf{Locust} đã \textbf{giảm đáng kể và mức tiêu hao bộ nhớ cũng tăng nhiều}.
+
+\begin{itemize}
+	\item\textbf{Thí nghiệm 3:} Thử nghiệm việc sử dụng bộ nhớ của máy cục bộ khi thực thi các kiểm thử trong môi trường Docker với số lượng người dùng ảo khác nhau.
+	
+\end{itemize}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.85\textwidth]{figures/3_3.png} 
+	\caption{Memory usage per virtual user level on the docker environment}
+	\label{fig:memory-vu}
+\end{figure}
+
+\textbf{Kết quả:} Mức sử dụng bộ nhớ của \textbf{JMeter} tăng theo cấp số nhân khi số lượng người dùng ảo tăng lên. Việc sử dụng bộ nhớ của \textbf{Gatling} cũng bị ảnh hưởng bởi số lượng người dùng, nhưng không nhiều như \textbf{JMeter}. Qua đó, nổi bật nhất là mức sử dụng bộ nhớ của \textbf{Locust} gần như không thay đổi đáng kể, dù số lượng người dùng ảo tăng.
+
+\begin{quote}
+	\textbf{⇒ Locust là công cụ hiệu quả nhất về sử dụng bộ nhớ trong 3 công cụ.}
+\end{quote}
+
+\begin{itemize}
+	\item\textbf{Thí nghiệm 4:} Thử nghiệm thời gian phản hồi của hệ thống khi tăng số lượng người dùng
+	
+\end{itemize}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.85\textwidth]{figures/3_4.png} 	
+	\caption{Response time at different virtual user levels}
+	\label{fig:response-time-vu}
+\end{figure}
+
+\textbf{Kết quả:} Thời gian phản hồi của hệ thống tăng tuyến tính đối với cả ba công cụ kiểm thử. Tuy nhiên, \textbf{Gatling} làm cho thời gian phản hồi tăng nhiều nhất khi số lượng người dùng ảo tăng lên, trong khi đó \textbf{Locust} giữ vị trí thứ hai.
+
+\begin{quote}
+	\textbf{⇒ Gatling có độ trễ phản hồi tăng mạnh nhất khi số lượng người dùng tăng cao.}
+\end{quote}
+
+\begin{itemize}
+	\item\textbf{Thí nghiệm 5:}Thử nghiệm hiệu năng của 3 công cụ kiểm thử tải k6, Locust và Taurus khi thực hiện trên 3 loại máy chủ AWS EC2 có cấu hình yếu, trung bình và mạnh với số lượng người dùng ảo thay đổi.
+	
+\end{itemize}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.85\textwidth]{figures/3_5.png} 	
+	\caption{Kết quả thực nghiệm trên máy chủ cấu hình yếu (AWS EC2 t3.medium)}
+	\label{fig:aws-weak-node}
+\end{figure}
+
+\textbf{Kết quả:}
+Công cụ \textbf{k6} thể hiện hiệu năng vượt trội rõ rệt với:
+\begin{itemize}
+	\item Độ trễ trung bình thấp nhất (latency thấp nhất),
+	\item Thông lượng cao nhất (requests per second cao hơn hơn 3 lần so với các công cụ còn lại),
+	\item Và thời gian chạy kiểm thử nhanh nhất (total runtime ngắn nhất).
+\end{itemize}
+
+Ngược lại, \textbf{Locust} và \textbf{Taurus} hoạt động rất kém trên cấu hình máy chủ yếu:
+\begin{itemize}
+	\item Độ trễ phản hồi rất cao,
+	\item Thông lượng thấp,
+	\item Thời gian thực thi bài kiểm thử dài hơn đáng kể.
+\end{itemize}
+
+\begin{quote}
+	\textbf{⇒ Trong điều kiện máy chủ yếu, Locust có độ trễ phản hồi cao nhất và hoạt động không hiệu quả bằng k6.}
+\end{quote}
+
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.85\textwidth]{figures/3_6.png} 
+	\caption{Kết quả thực nghiệm trên máy chủ cấu hình trung bình (AWS EC2 c5d.2xlarge)}
+	\label{fig:aws-medium-node}
+\end{figure}
+
+\textbf{Kết luận:}
+So với kết quả trên máy chủ có cấu hình yếu, hiệu suất của hai công cụ \textbf{Locust} và \textbf{Taurus} đã được cải thiện đáng kể khi chạy trên phần cứng trung bình:
+\begin{itemize}
+	\item Độ trễ phản hồi (latency) giảm rõ rệt.
+	\item Số lượng yêu cầu xử lý mỗi giây (requests per second) tăng lên đáng kể.
+	\item Thời gian thực hiện toàn bộ bài kiểm thử (total runtime) ngắn hơn.
+\end{itemize}
+
+\begin{quote}
+	\textbf{⇒ Các công cụ bắt đầu thể hiện hiệu quả tốt hơn khi tài nguyên hệ thống được mở rộng, đặc biệt là Locust.}
+\end{quote}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.85\textwidth]{figures/3_7.png} 
+	\caption{Kết quả thực nghiệm trên máy chủ cấu hình mạnh (AWS EC2 c5d.4xlarge)}
+	\label{fig:aws-strong-node}
+\end{figure}
+
+\textbf{Kết luận:}
+Dựa trên kết quả thực nghiệm:
+\begin{itemize}
+	\item K6 tiếp tục duy trì vị trí dẫn đầu về tất cả các chỉ số: độ trễ thấp nhất, lượng yêu cầu xử lý mỗi giây cao nhất, và thời gian thực thi ngắn nhất.
+	\item Locust và Taurus đều cho thấy sự cải thiện rõ rệt về hiệu suất khi chuyển sang chạy trên máy chủ mạnh.
+	\item Locust đã có thể khai thác tốt hơn sức mạnh của phần cứng, đạt được hiệu năng gần tiệm cận với K6.
+\end{itemize}
+
+\begin{quote}
+	\textbf{⇒ Tổng quan:} \textbf{K6} là công cụ cho hiệu năng vượt trội và ổn định nhất trên cả ba loại cấu hình, trong khi đó \textbf{Locust} thể hiện hiệu suất phụ thuộc nhiều vào tài nguyên phần cứng.
+\end{quote}
+
+\subsection{Đánh giá dựa trên các tiêu chí kĩ thuật}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.85\textwidth]{figures/3_8.png}
+\end{figure}
+
+\noindent
+\textbf{Kết luận:} Qua bảng so sánh trên, \textbf{k6}, \textbf{Locust} và \textbf{Taurus} đều cho thấy khả năng đáp ứng các tiêu chí kỹ thuật vượt trội, đặc biệt là khả năng tương thích với \texttt{GitLab}, là dự án \textit{Open source}, hỗ trợ đám mây và có ngôn ngữ kịch bản linh hoạt.
 
