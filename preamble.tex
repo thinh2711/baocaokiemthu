@@ -8,6 +8,9 @@
 \usepackage{geometry}
 \geometry{a4paper, left=3cm, right=2cm, top=2.5cm, bottom=2.5cm}
 
+\usepackage{fancyvrb}
+\usepackage{color}
+
 \usepackage{graphicx}
 \usepackage{xcolor}
 \usepackage{enumitem}
@@ -55,5 +58,37 @@ citecolor=black,     % citation giữ màu đen
 pdfborder={0 0 1}    % gạch chân link ngoài
 ]{hyperref}
 
-\usepackage[backend=biber,style=ieee]{biblatex}
-\addbibresource{refs.bib}   % hoặc tên file bib của bạn
+\usepackage{listings}
+\renewcommand{\lstlistingname}{Ví dụ}
+
+\lstset{
+	basicstyle=\ttfamily\footnotesize,
+	breaklines=true,
+	frame=single,
+	backgroundcolor=\color{gray!10},
+	keywordstyle=\color{blue},
+	commentstyle=\color{green!50!black},
+	stringstyle=\color{red},
+	showstringspaces=false,
+	language=Python,
+	numbers=left,
+	numberstyle=\tiny\color{gray}
+}
+
+% Định nghĩa ngôn ngữ YAML cho listings
+\lstdefinelanguage{yaml}{
+	keywords={true,false,null,y,n},
+	keywordstyle=\color{blue}\bfseries,
+	basicstyle=\ttfamily\small,
+	sensitive=false,
+	comment=[l]{\#},
+	morecomment=[l]{\#},
+	morestring=[b]",
+	morestring=[b]'
+}
+
+\usepackage[normalem]{ulem}
+\usepackage{amssymb}          
+\usepackage{pifont}
+
+

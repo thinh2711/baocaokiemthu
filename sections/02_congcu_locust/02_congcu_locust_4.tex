@@ -1,0 +1,46 @@
+\section{Cách thức hoạt động}
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.85\textwidth]{figures/phan2_4.png}
+	\caption{Quy trình cho 1 ca kiểm thử với công cụ Locust}
+\end{figure}
+
+
+\textbf{Khởi tạo:} Locust đọc file cấu hình (\texttt{locustfile.py}) chứa các lớp \texttt{User} và \texttt{task} định nghĩa hành vi kiểm thử. \texttt{Master process} được khởi động và tạo giao diện Web UI trên cổng 8089.
+
+\vspace{1em}
+\textbf{Kiến trúc Master-Worker:} \texttt{Master process} điều phối và phân phối công việc đến các \texttt{worker processes}. Mỗi \texttt{worker} chạy độc lập và quản lý một nhóm người dùng ảo thông qua \textbf{greenlets (gevent)}, cho phép xử lý đồng thời hàng nghìn kết nối với overhead thấp.
+
+\vspace{0.5em}
+\begin{itemize}
+	\item \textbf{Greenlet (gevent):} Lightweight coroutine (tiến trình nhẹ) cho phép xử lý đồng thời hàng nghìn kết nối trên một thread mà không tốn nhiều bộ nhớ, tạo ra hiệu suất cao hơn so với multithreading truyền thống.
+	
+	\item \textbf{Mô hình Greenlet (gevent):} Sử dụng coroutines để mô phỏng nhiều người dùng đồng thời trên một thread duy nhất. Khi một \texttt{greenlet} chờ response từ API, \texttt{gevent} tự động chuyển sang \texttt{greenlet} khác, tối ưu hóa việc sử dụng CPU.
+\end{itemize}
+
+\vspace{0.5em}
+\textbf{Virtual User:} Người dùng ảo được mô phỏng bởi \texttt{greenlet} để tạo ra tải truy cập đồng thời vào hệ thống, mỗi \texttt{user} thực hiện các \texttt{task} theo kịch bản định sẵn.
+
+\begin{itemize}
+	\item \textbf{Vòng đời của mỗi \textit{virtual user}}: Mỗi virtual user trải qua 3 giai đoạn: khởi tạo với phương thức \texttt{on\_start()}, thực thi vòng lặp tasks liên tục để gửi HTTP requests đến API đích, và kết thúc với \texttt{on\_stop()} khi test hoàn tất.
+	\item \textbf{Tasks Loop}: Vòng lặp thực thi liên tục các tác vụ (HTTP requests) để mô phỏng hành vi người dùng thực tế, bao gồm các hành động như đăng nhập, truy vấn dữ liệu, gửi form.
+\end{itemize}
+
+\vspace{0.5em}
+\textbf{Thu thập và tổng hợp số liệu:} Mỗi worker gửi \textit{metrics} về master process thông qua message queue. Master tổng hợp dữ liệu từ tất cả workers thành module \textit{Stats Aggregation}, tính toán các chỉ số như:
+\begin{itemize}
+	\item \textbf{request count} (số lượng requests),
+	\item \textbf{response times} (thời gian phản hồi),
+	\item \textbf{failures} (lỗi),
+	\item \textbf{RPS} (requests per second),
+	\item \textbf{percentiles} (phân vị: P50, P95, P99).
+\end{itemize}
+
+\vspace{0.5em}
+\textbf{Hiển thị kết quả:} Master cung cấp 4 hình thức \textit{output} chính:
+\begin{itemize}
+	\item \textbf{Web UI Dashboard}: Giao diện web hiển thị biểu đồ thời gian thực (\textit{real-time charts}), bảng thống kê chi tiết (\textit{statistics table}), bảng điều khiển (\textit{control panel}) để \texttt{start}/\texttt{stop} test, và khả năng tải xuống báo cáo.
+	\item \textbf{Test Reports}: Các báo cáo chi tiết dạng \textit{HTML report} và \textit{CSV statistics}, bao gồm phân bố thời gian phản hồi (\textit{response time distribution}) và nhật ký lỗi (\textit{failure logs}).
+	\item \textbf{Real-time Monitoring}: Giám sát trực tiếp số người dùng đang hoạt động (\textit{active users}), RPS hiện tại (\textit{current RPS}), tỷ lệ lỗi (\textit{error rate}), và xu hướng thời gian phản hồi (\textit{response time trends}).
+	\item \textbf{Stats Aggregation}: Tổng hợp tất cả số liệu thống kê để phân tích tổng quan hiệu suất hệ thống.
+\end{itemize}
