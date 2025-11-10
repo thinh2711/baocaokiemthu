@@ -56,10 +56,7 @@
       <file>biblatex.def</file>
       <file>standard.bbx</file>
       <file>numeric.bbx</file>
-      <file>numeric-comp.bbx</file>
-      <file>ieee.bbx</file>
-      <file>numeric-verb.cbx</file>
-      <file>ieee.cbx</file>
+      <file>numeric.cbx</file>
       <file>biblatex.cfg</file>
     </requires>
   </internal>
@@ -82,7 +79,7 @@
       <file>main.bcf</file>
     </requires>
     <requires type="editable">
-      <file>refs.bib</file>
+      <file>references.bib</file>
     </requires>
   </external>
 </requests>

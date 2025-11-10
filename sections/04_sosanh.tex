@@ -1,6 +1,5 @@
 % Phần 4: So sánh Locust với các công cụ kiểm thử hiệu năng tương tự
-
-\section{Giới thiệu chung về Locust}
+\chapter{So sánh Locust với các công cụ kiểm thử hiệu năng tương tự}
 
 Nền tảng kiến trúc của Locust dựa trên cơ chế xử lý đồng thời điều khiển bằng sự kiện (event-driven), sử dụng các coroutine cực nhẹ gọi là greenlet. Điều này cho phép một máy duy nhất có thể mô phỏng hàng ngàn người dùng đồng thời mà không tiêu tốn nhiều tài nguyên, một ưu điểm lớn so với các công cụ dựa trên luồng truyền thống. Để đánh giá đúng vị thế của Locust, nhóm em sẽ so sánh trực tiếp nó với ba công cụ phổ biến khác trong ngành: Apache JMeter, K6, và Gatling.
 

@@ -28,6 +28,8 @@
 \usepackage{ragged2e}    % \RaggedRight cho cột X
 \usepackage{booktabs}    % nếu dùng \toprule...\midrule (tuỳ chọn)
 \usepackage{caption}     % tinh chỉnh caption
+\usepackage{float}
+\captionsetup[longtable]{justification=centering}
 
 
 
@@ -39,6 +41,11 @@
 \captionsetup[longtable]{skip=1em} % khoảng cách caption
 \setlength{\tabcolsep}{8pt} % khoảng cách ngang trong ô
 \renewcommand{\arraystretch}{1.35} % tăng chiều cao hàng cho dễ đọc
+
+
+\usepackage[backend=biber,style=numeric]{biblatex}
+\addbibresource{references.bib} % hoặc tên file .bib của bạn
+
 
 
 \usepackage{titlesec}
