@@ -59,3 +59,39 @@ Một ví dụ đơn giản về kiểm thử tải một website với Locust:
 \end{lstlisting}
 
 Sau khi chạy, mở trình duyệt và truy cập \textcolor{teal}{http://localhost:8089} để cấu hình số người dùng và tốc độ sinh người dùng.
+
+%------------------------------------------------------
+\section{Báo cáo và phân tích}
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{figures/2_8.png}
+	\caption{Giao diện biểu đồ tải theo thời gian thực của Locust}
+\end{figure}
+
+Sau khi kiểm thử, Locust cung cấp \textbf{báo cáo chi tiết} về hiệu năng:
+
+\begin{itemize}
+	\item \textbf{Thống kê thời gian thực:}
+	
+	Hiển thị số lượng request, thời gian phản hồi trung bình, tỉ lệ lỗi, độ lệch chuẩn và 
+	các phân vị (percentiles 50\%, 95\%, 99\%).
+	
+	\item \textbf{Xuất dữ liệu:}
+	
+	Locust có thể xuất kết quả ra \texttt{file CSV} để phân tích sau:
+	
+	\begin{lstlisting}
+		locust -f locustfile.py --csv=result
+	\end{lstlisting}
+	
+	\item \textbf{Biểu đồ và đồ thị:}
+	
+	Locust cung cấp các biểu đồ tải theo thời gian, giúp dễ dàng quan sát khi nào hệ thống 
+	bắt đầu chậm hoặc lỗi xuất hiện.
+	
+	\item \textbf{Kết quả định lượng:}
+	
+	Thông qua các chỉ số như \textit{Average Response Time}, 
+	\textit{Requests per Second}, \textit{Failure Rate}, người kiểm thử có thể xác định 
+	\textbf{ngưỡng chịu tải tối ưu} và \textbf{vùng rủi ro hiệu năng}.
+\end{itemize}

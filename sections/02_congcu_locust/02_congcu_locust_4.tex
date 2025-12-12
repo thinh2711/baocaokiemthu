@@ -1,46 +1,1187 @@
-\section{Cách thức hoạt động}
+\section{Kiến trúc cốt lõi của Locust}
+
+Kiến trúc của Locust được thiết kế xoay quanh một số thành phần lõi, phối hợp với nhau để 
+mô phỏng \textbf{hàng nghìn người dùng đồng thời} gửi request đến \textit{target system} 
+(hệ thống đích) và thu thập thông kê hiệu năng. Phần này tập trung mô tả \textbf{kiến trúc nội bộ} 
+và cách tổ chức mã nguồn của Locust; cách sử dụng chi tiết và API cụ thể sẽ được trình bày ở 
+phần ``Using Locust'', còn cơ chế mở rộng framework sẽ được đề cập ở phần ``Extending Locust''.
+
 \begin{figure}[H]
 	\centering
-	\includegraphics[width=0.85\textwidth]{figures/phan2_4.png}
-	\caption{Quy trình cho 1 ca kiểm thử với công cụ Locust}
+	\includegraphics[width=0.6\textwidth]{figures/phan2_4/2_4_0.png}
+	\caption{Kiến trúc cốt lõi của Locust}
+	\label{fig:locust-core-architecture}
+\end{figure}
+
+Ở mức khái quát, một bài test Locust bao gồm các khối chính:
+
+\begin{itemize}
+	\item \textbf{Test Definition} (định nghĩa bài test) trong \texttt{locustfile.py}: khai báo \textbf{User Classes} (lớp người dùng ảo) và các \textbf{Task Definitions} (định nghĩa tác vụ), tuỳ chọn thêm \textbf{LoadTestShape} (mô tả đường cong tải – số user theo thời gian).
+	
+	\item \textbf{Command \& Control} (điều khiển): mã trong \texttt{main.py} hoặc lệnh dòng lệnh (command line) chịu trách nhiệm khởi động Locust, đọc tham số, nạp \texttt{locustfile}, tạo \textbf{Environment} (môi trường thực thi) và \textbf{Runner} (bộ điều phối chạy test).
+	
+	\item \textbf{Execution} (thực thi): \textbf{Runner} sẽ tạo ra các \textbf{User instances} (thể hiện người dùng ảo), phân phối chúng thông qua \textbf{UsersDispatcher}, thực thi \textbf{Tasks}, gửi \textbf{HTTP Requests} đến \textbf{Target System} thông qua các \textbf{HTTP Clients}.
+	
+	\item \textbf{Statistics \& Reporting System} (hệ thống thống kê \& báo cáo): các \textbf{RequestStats} ghi nhận số liệu từ Events, sau đó cung cấp dữ liệu cho \textbf{Web UI} và các báo cáo CSV/HTML.
+	
+	\item \textbf{Web UI}: giao diện web cho phép người dùng khởi động/dừng test, theo dõi số liệu thời gian thực.
+\end{itemize}
+
+Các sơ đồ đi kèm mô tả rõ luồng dữ liệu từ khi Command Line/Web UI khởi động test, qua Environment, Runner, User, Client, đến Stats và hệ thống báo cáo.
+
+%===========================
+\subsection*{\color{red}{2.4.1 Command \& Control}}
+
+\subsubsection*{\color{blue}{2.4.1.1 Environment – Ngữ cảnh trung tâm của bài test}}
+
+\textbf{Environment class} (lớp \texttt{Environment}) đóng vai trò là \textbf{ngữ cảnh trung tâm} cho toàn bộ quá trình thực thi bài test Locust. Có thể coi Environment là một “container” tập trung, giữ tham chiếu tới tất cả các thành phần quan trọng của bài test và cung cấp điểm kết nối để các thành phần này tương tác với nhau một cách nhất quán.
+
+Khi Locust khởi động từ \texttt{main.py} (Command \& Control), chương trình sẽ gọi 
+\texttt{create\_environment()} để tạo ra một đối tượng \texttt{Environment}. Đối tượng này 
+sau đó được truyền cho \textbf{Runner}, \textbf{Web UI}, \textbf{Statistics system} và các module mở rộng khác, giúp chúng dùng chung cùng một bối cảnh cấu hình, event và trạng thái bài test.
+
+\begin{tcolorbox}[
+	title=\textbf{Environment},
+	colback=white,
+	colframe=black,
+	fonttitle=\large\bfseries,
+	breakable,
+	left=3mm, right=3mm, top=2mm, bottom=2mm
+	]
+	
+	% ====== Attributes ======
+	\textbf{Thuộc tính:}
+	
+	\begin{itemize}
+		\item \texttt{+user\_classes: list[type[User]]}
+		\item \texttt{+shape\_class: LoadTestShape}
+		\item \texttt{+events: Events}
+		\item \texttt{+runner: Runner}
+		\item \texttt{+stats: RequestStats}
+		\item \texttt{+web\_ui: WebUI}
+		\item \texttt{+host: str}
+		\item \texttt{+reset\_stats: bool}
+		\item \texttt{+stop\_timeout: float}
+		\item \texttt{+catch\_exceptions: bool}
+	\end{itemize}
+	
+	\vspace{3mm}
+	\hrule
+	\vspace{3mm}
+	
+	% ====== Methods ======
+	\textbf{Phương thức:}
+	
+	\begin{itemize}
+		\item \texttt{+create\_local\_runner()}
+		\item \texttt{+create\_master\_runner()}
+		\item \texttt{+create\_worker\_runner()}
+		\item \texttt{+create\_web\_ui()}
+	\end{itemize}
+	
+\end{tcolorbox}
+
+Sơ đồ lớp cho thấy \texttt{Environment} quản lý nhiều thuộc tính quan trọng:
+
+\begin{itemize}
+	\item \textbf{\texttt{user\_classes}: \textcolor{teal}{list[type[User]]}} \\
+	Danh sách User Classes (các lớp User mô tả hành vi người dùng ảo) sẽ được sử dụng trong bài test.
+	
+	\item \textbf{\texttt{shape\_class}: \textcolor{teal}{LoadTestShape}} \\
+	Lớp LoadTestShape (tùy chọn) dùng để điều khiển load pattern – tức là cách số lượng user thay đổi theo thời gian (tăng/ giảm tải).
+	
+	\item \textbf{\texttt{events}: \textcolor{teal}{Events}} \\
+	Tham chiếu đến Events system (hệ thống sự kiện). Đây là nơi các thành phần khác đăng ký lắng nghe các sự kiện như 
+	\texttt{test\_start}, \texttt{request\_success}, \texttt{request\_failure}, \texttt{spawning\_complete}, \ldots
+	
+	\item \textbf{\texttt{runner}: \textcolor{teal}{Runner}} \\
+	Đối tượng Runner (có thể là LocalRunner, MasterRunner hoặc WorkerRunner) gắn với Environment hiện tại, chịu trách nhiệm thực thi bài test dựa trên các User và Task đã định nghĩa.
+	
+	\item \textbf{\texttt{stats}: \textcolor{teal}{RequestStats}} \\
+	Đối tượng thu thập số liệu RequestStats – thành phần lỗi của hệ thống thống kê, thu thập và xử lý số liệu về request (response time, số lượng, throughput...).
+	
+	\item \textbf{\texttt{web\_ui}: \textcolor{teal}{WebUI}} \\
+	Tham chiếu tới WebUI (giao diện web dựa trên Flask) nếu bài test được chạy với chế độ có UI. Nếu chạy headless, thuộc tính này có thể là \texttt{None}.
+	
+	\item \textbf{\texttt{host}: \textcolor{teal}{str}} \\
+	Giá trị host mặc định của bài test (ví dụ: URL hệ thống đích). Thuộc tính này có thể được thiết lập ở mức Environment và/hoặc trong từng User.
+	
+	\item \textbf{\texttt{reset\_stats}: \textcolor{teal}{bool}} \\
+	Có cho phép reset thống kê trước khi bắt đầu đo chính thức (ví dụ: bỏ qua số liệu trong giai đoạn warm-up).
+	
+	\item \textbf{\texttt{stop\_timeout}: \textcolor{teal}{float}} \\
+	Thời gian tối đa (timeout) mà Runner chờ các user tự dừng (chạy xong vòng lặp hiện tại, gọi \texttt{on\_stop()}) trước khi ép dừng hẳn bài test.
+	
+	\item \textbf{\texttt{catch\_exceptions}: \textcolor{teal}{bool}} \\
+	Cho phép Environment quyết định có bắt (catch) ngoại lệ trong quá trình thực thi task hay không. Khi bật, lỗi trong task sẽ được ghi nhận vào thống kê thay vì làm crash toàn bộ bài test.
+\end{itemize}
+
+Nhờ tập trung tất cả thông tin cấu hình và trạng thái như trên, \texttt{Environment} giúp việc điều phối bài test trở nên rõ ràng, tách biệt với phần định nghĩa hành vi người dùng trong \texttt{locustfile.py}.
+
+\subsubsection*{b. Các phương thức tạo Runner và Web UI}
+
+Bên cạnh các thuộc tính, \textcolor{teal}{Environment} còn cung cấp một số \textit{factory methods} để tạo các thành phần thực thi chính:
+
+\begin{itemize}
+	\item \textbf{\textcolor{teal}{create\_local\_runner()}} \\
+	Tạo một \texttt{LocalRunner} cho các bài test trên một máy/tiến trình duy nhất.
+	
+	\item \textbf{\textcolor{teal}{create\_master\_runner()}} \\
+	Tạo \texttt{MasterRunner} khi chạy ở chế độ distributed load testing với mô hình master--worker. 
+	Master sẽ không tạo user mà chỉ điều phối và tổng hợp thống kê.
+	
+	\item \textbf{\textcolor{teal}{create\_worker\_runner()}} \\
+	Tạo \texttt{WorkerRunner} trên worker node, nhận lệnh từ master và trực tiếp spawn user, thực thi task.
+	
+	\item \textbf{\textcolor{teal}{create\_web\_ui()}} \\
+	Khởi tạo \texttt{WebUI} (Flask app + API routes + HTML templates) phục vụ việc điều khiển và giám sát test qua trình duyệt.
+\end{itemize}
+
+Việc gom logic tạo Runner và Web UI vào trong \textcolor{teal}{Environment} giúp cho \textcolor{teal}{main.py} chỉ cần:
+
+\begin{enumerate}
+	\item Tạo \textcolor{teal}{Environment},
+	\item Gọi đúng phương thức \texttt{create\_\textcolor{teal}{*}\_runner()},
+	\item (Tùy chọn) Gọi \texttt{create\_web\_ui()}.
+\end{enumerate}
+
+mà không cần tự tay lắp ghép các đối tượng con.
+
+\subsubsection*{c. Ví dụ tạo Environment trong \texttt{main.py}}
+
+Đoạn code dưới đây minh hoạ cách \texttt{Environment} được khởi tạo trong 
+\texttt{main.py}:
+
+\begin{lstlisting}[language=python]
+	environment = create_environment(
+	user_classes,
+	options,
+	events=locust_events,
+	shape_class=shape_class,
+	locustfile=locustfile_path,
+	parsed_locustfiles=locustfiles,
+	available_user_classes=available_user_classes,
+	available_shape_classes=available_shape_classes,
+	available_user_tasks=available_user_tasks,
+	)
+\end{lstlisting}
+
+Từ \texttt{environment} này, chương trình sẽ tiếp tục gọi:
+
+\begin{itemize}
+	\item \texttt{environment.create\_local\_runner()} hoặc
+	\item \texttt{environment.create\_master\_runner()} hoặc
+	\item \texttt{environment.create\_worker\_runner()}
+\end{itemize}
+
+tùy theo mô hình sử dụng, đồng thời tạo thêm \texttt{web\_ui} nếu người dùng không chạy headless.
+
+Như vậy, trong khối Command \& Control, \texttt{Environment} chính là 
+\textbf{điểm trung tâm} nối kết giữa phần cấu hình/định nghĩa test 
+(\texttt{locustfile.py}) và phần thực thi 
+(\texttt{Runner}, \texttt{WebUI}, \texttt{RequestStats}, \texttt{Events}).
+
+\subsubsection*{2.4.1.2 Runner System -- Hệ thống Runner}
+
+Hệ thống Runner trong Locust chịu trách nhiệm điều phối toàn bộ quá trình thực thi 
+bài test bằng cách quản lý vòng đời của các test user. Runner cung cấp nhiều 
+implementation khác nhau cho các kịch bản chạy local hoặc phân tán, xử lý logic 
+spawn/stop user, đồng thời giám sát tài nguyên hệ thống.
+
+\paragraph{a) Kiến trúc tổng quan của Runner}
+
+Kiến trúc Runner có dạng phân cấp như hình dưới đây:
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.92\linewidth]{figures/phan2_4/2_4_1_2_1.png}
+	\caption{Kiến trúc tổng quan hệ thống Runner}
+\end{figure}
+
+\begin{itemize}
+	\item Lớp trừu tượng \texttt{Runner} là nền tảng chung cho mọi loại runner.
+	\item Từ \texttt{Runner} tách ra:
+	\begin{itemize}
+		\item \textbf{LocalRunner} -- dùng cho kiểm thử local, một tiến trình duy nhất.
+		\item \textbf{DistributedRunner} -- lớp trừu tượng cho các runner phân tán:
+		\begin{itemize}
+			\item \textbf{MasterRunner} -- chạy trên master node, điều phối worker.
+			\item \textbf{WorkerRunner} -- chạy trên worker node, thực thi user theo lệnh master.
+		\end{itemize}
+	\end{itemize}
+\end{itemize}
+
+Mọi runner đều duy trì một trạng thái thực thi (\textit{runner state}) như:
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.75\linewidth]{figures/phan2_4/2_4_1_2_2.png}
+	\caption{Sơ đồ state machine của Runner trong Locust}
+\end{figure}
+
+\begin{itemize}
+	\item \textcolor{teal}{\texttt{STATE\_INIT}} (ready) -- mới khởi tạo, chưa chạy.
+	\item \textcolor{teal}{\texttt{STATE\_SPAWNING}} -- đang spawn user.
+	\item \textcolor{teal}{\texttt{STATE\_RUNNING}} -- đang chạy ổn định.
+	\item \textcolor{teal}{\texttt{STATE\_MISSING}} -- mất kết nối worker.
+	\item \textcolor{teal}{\texttt{STATE\_CLEANUP}}, 
+	\textcolor{teal}{\texttt{STATE\_STOPPING}}, 
+	\textcolor{teal}{\texttt{STATE\_STOPPED}} -- các giai đoạn dừng và dọn dẹp.
+\end{itemize}
+
+Việc dùng state machine giúp Runner kiểm soát rõ ràng luồng start/stop, xử lý 
+trường hợp lỗi và ngắt kết nối.
+
+\subsubsection*{b) Base Runner Class -- Lớp Runner cơ sở}
+
+Lớp \texttt{Runner} đóng vai trò là lớp trừu tượng nền tảng cho toàn bộ Runner System. 
+Nó định nghĩa các thuộc tính và hành vi chung, sau đó được các lớp con 
+(\texttt{LocalRunner}, \texttt{MasterRunner}, \texttt{WorkerRunner}) kế thừa và triển khai chi tiết.
+
+\textbf{Chức năng chính của Runner:}
+
+\begin{enumerate}
+	\item \textbf{Quản lý user (User Management)}
+	
+	\begin{itemize}
+		\item Theo dõi các user đang chạy thông qua 
+		\textcolor{teal}{\texttt{user\_greenlets}} (nhóm greenlet của gevent).
+		
+		\item Cung cấp các hàm:
+		\begin{itemize}
+			\item \textcolor{teal}{\texttt{spawn\_users()}} -- tạo và khởi động các User instances.
+			\item \textcolor{teal}{\texttt{stop\_users()}} -- dừng các user đang chạy.
+		\end{itemize}
+		
+		\item Theo dõi số lượng user theo từng User Class bằng thuộc tính 
+		\textcolor{teal}{\texttt{user\_classes\_count}}.
+	\end{itemize}
+	
+	\item \textbf{Vòng đời bài test (Test Lifecycle)}
+	
+	\begin{itemize}
+		\item Duy trì trạng thái bài test trong thuộc tính 
+		\textcolor{teal}{\texttt{state}}.
+		
+		\item Cung cấp các phương thức:
+		\begin{itemize}
+			\item \textcolor{teal}{\texttt{start(user\_count, spawn\_rate, wait, user\_classes)}} 
+			-- bắt đầu quá trình spawn user và chạy test (là abstract method, từng runner tự triển khai).
+			
+			\item \textcolor{teal}{\texttt{stop()}} -- dừng toàn bộ user và dọn dẹp.
+			
+			\item \textcolor{teal}{\texttt{quit()}} -- dừng test và huỷ các greenlet của runner.
+		\end{itemize}
+		
+		\item Trong quá trình này, Runner sẽ bắn (\textit{fire}) các events tương ứng, ví dụ: 
+		\textcolor{teal}{\texttt{test\_start}}, 
+		\textcolor{teal}{\texttt{spawning\_complete}}, 
+		\textcolor{teal}{\texttt{test\_stop}}.
+	\end{itemize}
+	
+	\item \textbf{Giám sát tài nguyên (Resource Monitoring)}
+	
+	\begin{itemize}
+		\item Chạy một tác vụ nền \textcolor{teal}{\texttt{monitor\_cpu\_and\_memory()}} 
+		để theo dõi CPU usage và memory usage.
+		
+		\item Khi CPU vượt ngưỡng cấu hình, Runner có thể phát cảnh báo, giúp 
+		người dùng nhận biết giới hạn máy chạy test.
+	\end{itemize}
+	
+	\item \textbf{Xử lý lỗi (Error Handling)}
+	
+	\begin{itemize}
+		\item Ghi log các ngoại lệ xảy ra trong quá trình thực thi 
+		(ví dụ lỗi trong task, lỗi RPC).
+		
+		\item Duy trì danh sách \textcolor{teal}{\texttt{exceptions}} để có thể thống kê, 
+		hiển thị trong Web UI hoặc xuất báo cáo.
+	\end{itemize}
+	
+\end{enumerate}
+
+\subsubsection*{c) Các Runner cụ thể}
+
+\paragraph{c.1) \texttt{LocalRunner} -- Kiểm thử một tiến trình}
+
+\textcolor{teal}{LocalRunner} được sử dụng trong kịch bản kiểm thử đơn giản, khi tất cả user 
+chạy trong cùng một tiến trình Python.
+
+\textbf{Đặc điểm:}
+
+\begin{itemize}
+	\item Cài đặt đơn giản, không có overhead mạng vì không phải giao tiếp master--worker.
+	\item Toàn bộ User \textcolor{teal}{Greenlets} nằm trong một process, được quản lý trực tiếp bởi LocalRunner.
+	\item Giới hạn bởi tài nguyên (CPU/RAM) của một máy duy nhất.
+\end{itemize}
+
+\textbf{Implementation tổng quát:}
+
+\begin{itemize}
+	\item Hàm khởi tạo \texttt{\_\_init\_\_(environment)} gán Environment, tạo client ID dựa trên hostname + UUID.
+	
+	\item Phương thức \texttt{start()} gọi \texttt{\_start()} nội bộ để:
+	\begin{itemize}
+		\item tính toán phân phối user theo từng User Class,
+		\item tạo greenlet spawn và lần lượt tạo User instance,
+		\item thêm chúng vào nhóm \textcolor{teal}{\texttt{user\_greenlets}}.
+	\end{itemize}
+	
+	\item Việc ``gửi message'' giữa các thành phần trong LocalRunner chủ yếu là gọi hàm trực tiếp, mô phỏng hành vi message-passing nhưng không cần RPC thực.
+\end{itemize}
+
+Trong cơ chế hoạt động, LocalRunner nhận Environment, tạo LocalRunner Process quản lý 
+các User Greenlet và cập nhật số liệu vào \texttt{RequestStats}.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.75\linewidth]{figures/phan2_4/2_4_1_2_c1.png}
 \end{figure}
 
 
-\textbf{Khởi tạo:} Locust đọc file cấu hình (\texttt{locustfile.py}) chứa các lớp \texttt{User} và \texttt{task} định nghĩa hành vi kiểm thử. \texttt{Master process} được khởi động và tạo giao diện Web UI trên cổng 8089.
+\paragraph{c.2) \texttt{DistributedRunner} -- Lớp trừu tượng cho runner phân tán}
+
+\textcolor{teal}{DistributedRunner} là một lớp cơ sở nhỏ dành cho các runner chạy trong môi trường 
+distributed load testing.
+
+\textbf{Nhiệm vụ chính:}
+
+\begin{itemize}
+	\item Thiết lập các event listener cho thống kê phân tán (\textit{distributed statistics}),
+	\item Chuẩn bị hạ tầng để \texttt{MasterRunner} và \texttt{WorkerRunner} có thể chia sẻ số liệu qua RPC.
+\end{itemize}
+
+Bản thân \texttt{DistributedRunner} không chạy trực tiếp test, mà chỉ cung cấp phần ``xương sống'' cho hai runner con.
+
+\paragraph{c.3) \texttt{MasterRunner} -- Điều phối test phân tán}
+
+\textcolor{teal}{MasterRunner} là runner chạy trên \textit{master node} trong mô hình master--worker.
+
+\textbf{Đặc điểm:}
+
+\begin{itemize}
+	\item Điều phối nhiều worker node thông qua cơ chế RPC dựa trên ZeroMQ (ZMQ).
+	\item Phân phối user cho từng worker dựa trên chiến lược \textit{user distribution} 
+	(thường là chia đều hoặc theo trọng số).
+	\item Tổng hợp (aggregate) thống kê từ tất cả worker và cập nhật vào 
+	\texttt{RequestStats} của \textit{master}.
+	\item Quản lý kết nối và heartbeat của các worker để phát hiện worker mất kết nối 
+	(\textcolor{teal}{STATE\_MISSING}).
+\end{itemize}
+
+\textbf{Implementation chính:}
+
+\begin{itemize}
+	\item Khi khởi tạo, \texttt{MasterRunner}:
+	\begin{itemize}
+		\item bind một \texttt{rpc.Server} vào 
+		\texttt{master\_bind\_host} + \texttt{master\_bind\_port},
+		\item khởi tạo collection \texttt{WorkerNodes} để lưu thông tin các worker.
+	\end{itemize}
+	
+	\item \texttt{MasterRunner}:
+	\begin{itemize}
+		\item lắng nghe \textcolor{teal}{message} từ worker 
+		(qua \texttt{recv\_from\_client()}),
+		\item gửi lệnh như \textcolor{teal}{spawn\_users}, 
+		\textcolor{teal}{stop} cho worker 
+		(qua \texttt{send\_to\_client()}).
+	\end{itemize}
+	
+	\item Định kỳ nhận \texttt{stats}, \texttt{heartbeat} để cập nhật trạng thái worker.
+	
+	\item Mỗi worker được gán một \textit{worker index} phục vụ định danh và phân phối tải.
+\end{itemize}
+
+Trong sơ đồ, \texttt{MasterRunner} gồm Master Process, \texttt{UsersDispatcher} (phân phối user),
+RPC Server giao tiếp với các \texttt{WorkerNodes}, và đường thống kê tổng hợp về 
+\texttt{RequestStats}.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.75\linewidth]{figures/phan2_4/2_4_1_2_c3.png}
+\end{figure}
+
+\paragraph{c.4) \texttt{WorkerRunner} -- Thực thi user trên worker node}
+
+\textcolor{teal}{WorkerRunner} chạy trên worker node và kết nối tới \texttt{MasterRunner}.
+
+\textbf{Đặc điểm:}
+
+\begin{itemize}
+	\item Nhận lệnh spawn/stop từ \texttt{MasterRunner} thông qua \texttt{rpc.Client}.
+	\item Tự tạo User instances, quản lý User Greenlet 1..n tương tự \texttt{LocalRunner}.
+	\item Định kỳ gửi thống kê (\texttt{stats}) và \texttt{heartbeat} về master.
+	\item Cập nhật trạng thái để master có thể phân loại 
+	(ready, spawning, running, missing).
+\end{itemize}
+
+\textbf{Implementation chính:}
+
+\begin{itemize}
+	\item \texttt{WorkerRunner} khởi tạo bằng 
+	\texttt{\_\_init\_\_(environment, master\_host, master\_port)}:
+	\begin{itemize}
+		\item tạo \texttt{rpc.Client} và kết nối tới RPC server của master,
+		\item gửi message \textcolor{teal}{client\_ready} để thông báo đã sẵn sàng.
+	\end{itemize}
+	
+	\item Đăng ký message handlers cho các lệnh từ master:
+	\begin{itemize}
+		\item lệnh spawn → gọi \textcolor{teal}{spawn\_users}(),
+		\item lệnh stop → gọi \texttt{stop()} và dọn dẹp user.
+	\end{itemize}
+	
+	\item Trong vòng lặp chính, \texttt{WorkerRunner}:
+	\begin{itemize}
+		\item gửi message \textcolor{teal}{stats} chứa số liệu hiện tại,
+		\item gửi \textcolor{teal}{heartbeat} ở chu kỳ \texttt{HEARTBEAT\_INTERVAL} để báo vẫn còn sống.
+	\end{itemize}
+\end{itemize}
+
+Trong sơ đồ, \texttt{WorkerRunner}, \texttt{WorkerProcess} nhận \texttt{Environment}, 
+tạo User Greenlets, gửi báo cáo sang \texttt{RequestStats} và giao tiếp với 
+\texttt{MasterRunner} qua RPC.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.75\linewidth]{figures/phan2_4/2_4_1_2_c4.png}
+\end{figure}
+
+\subsubsection *{d) Worker Node Management – Quản lý tập các Worker
+}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.2\linewidth]{figures/phan2_4/2_4_1_2_d.png}
+\end{figure}
+
+Trên phía master, việc quản lý các worker được đóng gói trong hai lớp:
+
+\begin{enumerate}
+	\item \textbf{\textcolor{teal}{WorkerNode}} -- biểu diễn một worker cụ thể, lưu:
+	\begin{itemize}
+		\item \texttt{id}: định danh worker,
+		\item \texttt{state}: trạng thái hiện tại (ready, spawning, running, missing, \ldots),
+		\item \texttt{heartbeat}: bộ đếm dùng để đánh giá worker còn phản hồi hay không,
+		\item \texttt{cpu\_usage}, \texttt{memory\_usage}: thông tin sử dụng tài nguyên của worker,
+		\item \texttt{user\_classes\_count}: số user đang chạy theo từng User Class,
+		kèm phương thức \texttt{user\_count()} tính tổng.
+	\end{itemize}
+	
+	\item \textbf{\textcolor{teal}{WorkerNodes}} -- collection quản lý nhiều \texttt{WorkerNode}:
+	\begin{itemize}
+		\item nội bộ dùng \texttt{\_worker\_nodes: dict} ánh xạ \texttt{id → WorkerNode},
+		\item hỗ trợ các phép toán giống dictionary 
+		(\texttt{\_\_getitem\_\_}, \texttt{\_\_setitem\_\_}, 
+		\texttt{\_\_delitem\_\_}, \texttt{\_\_len\_\_}, \texttt{\_\_iter\_\_}),
+		\item cung cấp các phương thức/tính năng tiện ích:
+		\begin{itemize}
+			\item \texttt{get\_by\_state(state)} – lọc các worker theo trạng thái,
+			\item \textcolor{teal}{ready}, \textcolor{teal}{spawning}, 
+			\textcolor{teal}{running}, \textcolor{teal}{missing} – trả về danh sách worker theo từng trạng thái.
+		\end{itemize}
+	\end{itemize}
+\end{enumerate}
+
+Nhờ đó, \texttt{MasterRunner} có thể dễ dàng:
+\begin{itemize}
+	\item xác định bao nhiêu worker ``ready'' trước khi bắt đầu test,
+	\item phân phối user chỉ cho các worker ``running'',
+	\item phát hiện worker ``missing'' do mất heartbeat.
+\end{itemize}
+
+\subsubsection*{e) Communication Mechanism – Cơ chế giao tiếp phân tán}
+
+Trong chế độ phân tán, \textbf{MasterRunner} và \textbf{WorkerRunner} giao tiếp thông qua 
+một hệ thống RPC (Remote Procedure Call) dựa trên ZeroMQ.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.9\textwidth]{figures/phan2_4/2_4_1_2_e.png}
+	\caption{Cơ chế giao tiếp RPC giữa MasterRunner và WorkerRunner}
+\end{figure}
+
+Các thành phần chính:
+
+\begin{itemize}
+	\item \textbf{Message class}: đóng gói thông tin message, gồm:
+	\begin{itemize}
+		\item \textbf{\textcolor{teal}{msg\_type}} (kiểu message: 
+		\textcolor{teal}{spawn}, \textcolor{teal}{stats}, \textcolor{teal}{heartbeat}, 
+		\textcolor{teal}{quit}, \ldots),
+		\item \textbf{payload} dữ liệu,
+		\item \textbf{node\_id} (id của worker).
+	\end{itemize}
+	
+	\item \textbf{\textcolor{teal}{rpc.Server}}: chạy ở phía master, sử dụng socket 
+	\textcolor{teal}{ZMQ\_ROUTER}, chịu trách nhiệm:
+	\begin{itemize}
+		\item lắng nghe message từ các worker,
+		\item chuyển message đến \textbf{MasterRunner}.
+	\end{itemize}
+	
+	\item \textbf{\textcolor{teal}{rpc.Client}}: chạy ở phía worker, dùng socket 
+	\textcolor{teal}{ZMQ\_DEALER}, gửi:
+	\begin{itemize}
+		\item \textcolor{teal}{client\_ready}, 
+		\item \textcolor{teal}{stats}, 
+		\item \textcolor{teal}{heartbeat}, 
+		\item \ldots đến master.
+	\end{itemize}
+\end{itemize}
+
+Đặc điểm implementation:
+
+\begin{itemize}
+	\item Message được serialize bằng \textbf{msgpack}, tối ưu cho tốc độ và kích thước.
+	\item Thiết lập TCP \textbf{keepalive} để tăng độ tin cậy kết nối dài.
+	\item Có cơ chế \textbf{retry} và xử lý ngoại lệ (network errors, timeout)
+	để tránh làm crash toàn bộ runner.
+\end{itemize}
+
+Sơ đồ trình tự cho thấy: \textbf{MasterRunner} tạo và bind \textcolor{teal}{rpc.Server}, 
+\textbf{WorkerRunner} tạo \textcolor{teal}{rpc.Client} và \textcolor{teal}{connect}, sau đó 
+hai bên trao đổi \textcolor{teal}{ZMQ message} liên tục trong suốt vòng đời bài test.
+
+\subsubsection *{f) User Spawning and Stopping – Quản lý vòng đời user
+}
+
+Một nhiệm vụ quan trọng của Runner System là điều khiển vòng đời của user: spawn đúng số lượng với tốc độ mong muốn, và dừng lại một cách an toàn.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.3\textwidth]{figures/phan2_4/2_4_1_2_f1.png} \hfill
+	\includegraphics[width=0.3\textwidth]{figures/phan2_4/2_4_1_2_f2.png}
+\end{figure}
+
+\textbf{Quy trình spawn user}
+
+\begin{enumerate}
+	\item Gọi \textcolor{teal}{start(user\_count, spawn\_rate, wait, user\_classes)} trên runner.
+	
+	\item Runner sử dụng \textbf{UsersDispatcher} để tính phân phối user theo User Class 
+	(ví dụ 70\% HttpUser A, 30\% HttpUser B).
+	
+	\item Tạo một \textit{spawning greenlet} riêng phụ trách logic spawn bất đồng bộ.
+	
+	\item Trong spawning greenlet:
+	\begin{itemize}
+		\item gọi \textcolor{teal}{spawn\_users()} → tạo từng User instance,
+		\item gọi \textcolor{teal}{user.start()} (hoặc tương đương) để bắt đầu vòng lặp task,
+		\item thêm greenlet của user vào \textcolor{teal}{user\_greenlets}.
+	\end{itemize}
+\end{enumerate}
+
+\vspace{12pt}
+\textbf{Quy trình stop user}
+
+\begin{enumerate}
+	\item Khi \textcolor{teal}{stop()} được gọi:
+	\begin{itemize}
+		\item Runner ghi lại \textbf{final\_user\_classes\_count} để lưu trạng thái cuối.
+	\end{itemize}
+	
+	\item Nếu vẫn còn spawning greenlet đang chạy, runner kill greenlet này.
+	
+	\item Gọi \textcolor{teal}{stop\_users()} để lần lượt dừng tất cả user instance:
+	\begin{itemize}
+		\item gọi \textcolor{teal}{user.stop()} / set flag để dừng vòng lặp task,
+		\item chờ user kết thúc, sau đó remove khỏi \textcolor{teal}{user\_greenlets}.
+	\end{itemize}
+\end{enumerate}
+
+\vspace{10pt}
+
+\noindent Cách tổ chức spawn/stop theo hai ``process'' logic riêng (spawning process, 
+stop\_users process) giúp runner xử lý quá trình thay đổi tải mượt mà, 
+tránh việc tạo/dừng user đột ngột gây nhiễu kết quả test.
+
+\subsubsection*{g) Shape-based Load Testing – Kiểm thử theo đường cong tải}
+
+Runner System hỗ trợ \textbf{shape-based load testing} thông qua integration với các lớp
+\textcolor{teal}{LoadTestShape}.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.78\textwidth]{figures/phan2_4/2_4_1_2_g.png}
+	\caption{Luồng xử lý Shape-based Load Testing}
+\end{figure}
+
+\noindent \textbf{Cơ chế:}
+
+\begin{itemize}
+	\item Gọi \textcolor{teal}{start\_shape()} trên Runner:
+	\begin{itemize}
+		\item Runner spawn một greenlet \textcolor{teal}{shape\_worker}.
+	\end{itemize}
+	
+	\item Trong \textcolor{teal}{shape\_worker}:
+	\begin{itemize}
+		\item vòng lặp định kỳ (thường mỗi giây) gọi \textcolor{teal}{shape\_class.tick()},
+		\item \textcolor{teal}{tick()} trả về một cặp \textcolor{teal}{(user\_count, spawn\_rate)} mong muốn,
+		hoặc \textcolor{teal}{None} nếu muốn kết thúc test.
+	\end{itemize}
+\end{itemize}
+
+\vspace{6pt}
+
+\noindent Từ cặp dữ liệu tick:
+\begin{itemize}
+	\item Runner so sánh với số user hiện tại và điều chỉnh bằng cách gọi  
+	\textcolor{teal}{start()}/\textcolor{teal}{spawn\_users()} hoặc \textcolor{teal}{stop\_users()} tương ứng.
+	\item Khi \textcolor{teal}{tick()} trả về \textcolor{teal}{None}, Runner gọi \textcolor{teal}{stop()} để dừng toàn bộ test.
+\end{itemize}
+
+\vspace{8pt}
+
+\noindent Nhờ \textcolor{teal}{LoadTestShape}, người dùng có thể mô tả các kịch bản phức tạp như:
+ramp-up, ramp-down, sống tại, spike test… bằng Python, trong khi Runner đảm nhận phần
+thực thi chi tiết.
+
+\subsubsection* {h) Environment Integration – Tích hợp với Environment
+}
+Runner System gắn bó chặt chẽ với \textcolor{teal}{Environment}:
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.3\textwidth]{figures/phan2_4/2_4_1_2_h.png}
+\end{figure}
+
+\begin{itemize}
+	\item Mỗi Runner đều giữ tham chiếu đến:
+	\begin{itemize}
+		\item \textcolor{teal}{environment}: Environment,
+		\item \textcolor{teal}{stats}: RequestStats từ environment,
+		\item \textcolor{teal}{user\_classes}: list do environment cung cấp.
+	\end{itemize}
+	
+	\item Ngược lại, Environment:
+	\begin{itemize}
+		\item cung cấp các \textbf{factory method}:
+		\begin{itemize}
+			\item \textcolor{teal}{create\_local\_runner()},
+			\item \textcolor{teal}{create\_master\_runner()},
+			\item \textcolor{teal}{create\_worker\_runner()},
+		\end{itemize}
+		
+		\item lưu lại tham chiếu \textcolor{teal}{runner} hiện tại để các thành phần khác (Web UI, extensions) có thể truy cập.
+	\end{itemize}
+\end{itemize}
+
+\vspace{10pt}
+
+\noindent Nhờ đó, phần \textbf{Command \& Control} trong \texttt{main.py} chỉ cần:
+
+\begin{lstlisting}[language=Python]
+	env = create_environment(...)
+	if options.master:
+	runner = env.create_master_runner(...)
+	elif options.worker:
+	runner = env.create_worker_runner(...)
+	else:
+	runner = env.create_local_runner()
+\end{lstlisting}
+
+\noindent Toàn bộ chi tiết cấu hình và liên kết bên trong đã được Environment và Runner System xử lý.
+
+\vspace{12pt}
+
+\subsubsection*{i) Command-line Integration – Tích hợp với giao diện dòng lệnh}
+
+Runner System được cấu hình thông qua \textbf{command-line interface} của Locust, giúp người dùng dễ dàng lựa chọn chế độ chạy.
+
+\noindent Một số tùy chọn quan trọng:
+
+\begin{itemize}
+	\item \texttt{--master} – chạy tiến trình hiện tại như \textbf{master node}.
+	\item \texttt{--worker} – chạy như \textbf{worker node}.
+	\item \texttt{--master-bind-host}, \texttt{--master-bind-port} – địa chỉ/port master lắng nghe worker.
+	\item \texttt{--master-host}, \texttt{--master-port} – địa chỉ/port worker dùng để kết nối tới master.
+	\item \texttt{--expect-workers}, \texttt{--expect-workers-max-wait} – số lượng worker mong đợi và thời gian chờ tối đa trước khi bắt đầu test.
+	\item \texttt{--headless} – chạy không cần Web UI (thường dùng trong CI/CD).
+	\item \texttt{--users} / \texttt{-u} – tổng số user mục tiêu.
+	\item \texttt{--spawn-rate} / \texttt{-r} – tốc độ spawn user (user/s).
+	\item \texttt{--run-time} / \texttt{-t} – giới hạn thời gian chạy test.
+\end{itemize}
+
+\vspace{6pt}
+
+\noindent Các option này được parse trong \texttt{argument\_parser.py} và truyền vào Environment/Runner, đảm bảo giao diện cấu hình thống nhất cho người dùng.
+
+
+\subsubsection*{j) Luồng thực hiện}
+	\begin{enumerate}
+    \item \textbf{Local testing workflow}
+	\begin{figure}[H]
+		\centering
+		\includegraphics[width=0.8\textwidth]{figures/phan2_4/2_4_1_2_j1.png}
+	\end{figure}
+    \item \textbf{Distributed testing workflow}
+	\begin{figure}[H]
+		\centering
+		\includegraphics[width=0.8\textwidth]{figures/phan2_4/2_4_1_2_j2.png}
+	\end{figure}
+	\end{enumerate}
+
+\subsubsection*{k) Tổng kết phần Runner System}
+
+Tóm lại, \textbf{Runner System} cung cấp kiến trúc linh hoạt và mở rộng cho việc thực thi bài test trong Locust:
+
+\begin{enumerate}
+	\item Lớp trừu tượng \textbf{Runner} định nghĩa lõi cho việc quản lý vòng đời bài test và \textit{User instances}.
+	
+	\item \textbf{LocalRunner} cung cấp implementation đơn giản cho kiểm thử \textit{single-process}.
+	
+	\item \textbf{MasterRunner} và \textbf{WorkerRunner} triển khai mô hình \textit{distributed load testing} trên nhiều tiến trình/máy khác nhau.
+	
+	\item Hệ thống hỗ trợ \textbf{spawn/stop user động} và \textbf{shape-based load testing} thông qua \texttt{LoadTestShape}.
+	
+	\item Tích hợp chặt chẽ với \texttt{Environment}, \texttt{RequestStats}, \texttt{Events} và Web UI để chia sẻ ngữ cảnh và số liệu.
+	
+	\item Cơ chế \textbf{ZeroMQ-based RPC} đảm bảo giao tiếp tin cậy trong môi trường phân tán.
+\end{enumerate}
+
+Nhờ thiết kế này, Locust có thể mở rộng từ các bài test nhỏ trên một máy đến các kịch bản load test phân tán quy mô lớn, trong khi vẫn giữ được API và hành vi nhất quán cho người dùng.
+
+\subsection *{\color{red}{2.4.2 Test Definition}}
+
+\subsubsection*{\color{blue}{2.4.2.1 Tổng quan và cấu trúc của User Classes và Tasks}}
+
+\paragraph{a) Mục đích và phạm vi}\leavevmode\\
+
+Hệ thống \textbf{User Classes} và \textbf{Tasks} là trung tâm cách Locust định nghĩa kịch bản load test.
+
+\begin{itemize}
+	\item \textbf{User Class} biểu diễn một \textit{virtual user} tương tác với \textit{system under test}.
+	\item \textbf{Task} mô tả các hành động mà user đó thực hiện (gửi request, duyệt trang, checkout, \ldots).
+\end{itemize}
+
+Nhờ kết hợp hai khái niệm này, Locust cho phép mô hình hóa hành vi người dùng một cách linh hoạt và sát thực tế.
+
+\medskip
+\hrule
+\medskip
+
+\paragraph{b) Phân cấp User Class (User Class Hierarchy)}\leavevmode\\
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.75\linewidth]{figures/phan2_4/2_4_2_1_b.png}
+	\caption{User Class hierarchy trong Locust}
+\end{figure}
+
+\noindent Lớp cơ sở \texttt{User} định nghĩa:
+
+\begin{itemize}
+	\item Danh sách \texttt{tasks} sẽ được thực thi.
+	\item Hàm \texttt{wait\_time} (mô phỏng “think-time”).
+	\item Lifecycle hooks như \texttt{on\_start()}, \texttt{on\_stop()}.
+	\item Thuộc tính \texttt{weight}, \texttt{fixed\_count}, \texttt{abstract} để điều khiển cách Runner spawn từng loại user.
+\end{itemize}
+
+\medskip
+
+\noindent Các HTTP user chuyên biệt:
+
+\begin{itemize}
+	\item \textbf{HttpUser} – dùng thư viện \texttt{requests} (gevent-compatible), cung cấp \texttt{self.client} dạng \texttt{HttpSession}.
+	\item \textbf{FastHttpUser} – dùng \texttt{geventhttpclient}, tối ưu hiệu năng hơn cho \textit{high-throughput test}.
+\end{itemize}
+
+Ngoài ra, developer có thể xây dựng \textcolor{blue}{CustomUser} 
+với client tùy ý cho các giao thức khác (WebSocket, gRPC, MQ,…), 
+vẫn kế thừa toàn bộ cơ chế task \& lifecycle từ \texttt{User}.
+
+Ví dụ:
+
+\begin{lstlisting}[language=Python]
+	from locust import HttpUser, task, between
+	
+	class WebsiteUser(HttpUser):
+	host = "http://example.com"
+	wait_time = between(2, 5)
+	
+	@task
+	def index_page(self):
+	self.client.get("/")
+\end{lstlisting}
+
+% -------------------------------------------------------------------
+
+\subsubsection*{c) Định nghĩa Task (Task Definition)}
+
+\textbf{Diagram: Task Definition and Execution Flow}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.95\linewidth]{figures/phan2_4/2_4_2_1_c.png}
+	\caption{Task Definition and Execution Flow}
+\end{figure}
+
+Task trong Locust có thể được định nghĩa theo nhiều cách:
+
+\begin{itemize}
+	\item Decorator \texttt{@task} trên method của \texttt{User}:
+\end{itemize}
+
+\begin{lstlisting}[language=Python]
+	class MyUser(User):
+	
+	@task
+	def my_task(self):
+	...
+\end{lstlisting}
+
+\medskip
+
+\begin{itemize}
+	\item \texttt{@task(\textcolor{blue}{weight})} với trọng số để điều khiển tần suất:
+\end{itemize}
+
+\begin{lstlisting}[language=Python]
+	class MyUser(User):
+	
+	@task(3)
+	def common_task(self):
+	...
+	
+	@task(1)
+	def rare_task(self):
+	...
+\end{lstlisting}
+
+\medskip
+
+\begin{itemize}
+	\item Gán list \texttt{tasks} cho thuộc tính \texttt{tasks}:
+\end{itemize}
+
+\begin{lstlisting}[language=Python]
+	def task1(user):
+	...
+	
+	def task2(user):
+	...
+	
+	class MyUser(User):
+	tasks = [task1, task2]
+\end{lstlisting}
+
+\medskip
+
+\begin{itemize}
+	\item Gán \texttt{TaskSet} vào \texttt{tasks} để gom các hành vi phức tạp thành một nhóm.
+\end{itemize}
+
+
+\paragraph{d) Tổ chức Task bằng \texttt{TaskSet} và \texttt{SequentialTaskSet}}
+
+\texttt{TaskSets} cung cấp một cách để nhóm các nhiệm vụ liên quan và tạo cấu trúc nhiệm vụ phân cấp.
+
+\medskip
+
+\noindent \textbf{Diagram: TaskSet Hierarchy and Nesting}
+
+\paragraph{d) Tổ chức Task bằng \texttt{TaskSet} và \texttt{SequentialTaskSet}}
+
+\texttt{TaskSets} cung cấp một cách để nhóm các nhiệm vụ liên quan và tạo cấu trúc nhiệm vụ phân cấp.
+
+\medskip
+
+\noindent \textbf{Diagram: TaskSet Hierarchy and Nesting}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.5\linewidth]{figures/phan2_4/2_4_2_1_d.png}
+\end{figure}
+
+\textbf{TaskSet}:
+\begin{itemize}
+	\item Chứa các method \texttt{@task}, function task, hoặc TaskSet con (nested \texttt{TaskSets}).
+	\item Có \texttt{on\_start()}, \texttt{on\_stop()}, có thể định nghĩa \texttt{wait\_time} riêng.
+	\item Có thể gọi \texttt{self.interrupt()} để dừng TaskSet hiện tại và trả quyền điều khiển về parent.
+\end{itemize}
+
+\medskip
+
+\textbf{SequentialTaskSet}:
+\begin{itemize}
+	\item Thực thi task \textbf{theo đúng thứ tự định nghĩa}, không chọn ngẫu nhiên theo weight.
+	\item Phù hợp mô phỏng workflow cố định: login → add\_to\_cart → checkout.
+	\item Có thể \texttt{interrupt()} để kết thúc sequence.
+\end{itemize}
+
+\medskip
+\hrule
+\medskip
+
+\subsubsection*{e) Luồng chọn và thực thi Task (Task Selection \& Execution Flow)}
+
+Khi Runner spawn một User instance, luồng cơ bản:
+
+\begin{enumerate}
+	\item \textbf{User spawning}: Runner tạo instance.
+	\item \textbf{Khởi tạo}: gọi \texttt{on\_start()} của User và TaskSet.
+	\item \textbf{Task loop}:
+	\begin{itemize}
+		\item Chọn task:
+		\begin{itemize}
+			\item User/TaskSet thường → chọn ngẫu nhiên theo weight,
+			\item \texttt{SequentialTaskSet} → chạy tuần tự theo thứ tự định nghĩa.
+		\end{itemize}
+		\item Thực thi task; nếu task là TaskSet, quyền điều khiển chuyển vào TaskSet đó.
+		\item Chờ theo hàm \texttt{wait\_time}, sau đó lặp lại.
+	\end{itemize}
+	\item \textbf{Dừng user}: khi Runner stop, gọi \texttt{on\_stop()} để giải phóng tài nguyên.
+\end{enumerate}
+
+\medskip
+\hrule
+\medskip
+
+\subsubsection*{f) Wait Time Functions – Hàm thời gian chờ}
+
+\textcolor{teal}{wait\_time} là một callable trả về \textbf{số giây chờ} giữa hai lần chạy task, giúp mô phỏng think-time.
+
+Một số hàm dựng sẵn:
+
+\begin{itemize}
+	\item \textcolor{teal}{between(min\_time, max\_time)} – random trong khoảng \textcolor{teal}{[min, max]}.
+	\item \textcolor{teal}{constant(time)} – chờ cố định.
+	\item \textcolor{teal}{constant\_pacing(time)} – cố gắng giữ \textbf{time giữa hai lần bắt đầu task} cố định.
+	\item \textcolor{teal}{constant\_throughput(tasks\_per\_sec)} – cố gắng duy trì throughput \textcolor{teal}{tasks/s}.
+\end{itemize}
+
+Ngoài ra có thể dùng lambda/function tùy chỉnh:
+
+\begin{verbatim}
+	wait_time = lambda self: random.expovariate(1.0)
+\end{verbatim}
+
+\subsubsection*{g) Task Tagging, Lifecycle Hooks và các mẫu sử dụng}
+
+\paragraph{} 
+\textbf{Tag task} bằng \texttt{@tag} để lọc khi chạy test:
+
+\begin{verbatim}
+	class WebUser(User):
+	
+	@task
+	@tag("browse")
+	def browse_products(self):
+	...
+	
+	@task
+	@tag("purchase", "critical")
+	def purchase(self):
+	...
+\end{verbatim}
+
+Chạy với \textcolor{teal}{--tags browse} hoặc \textcolor{teal}{--exclude-tags critical} để chỉ lấy/bỏ các task có tag tương ứng.
+
+\medskip
+
+\textbf{Lifecycle hooks:}
+
+\begin{itemize}
+	\item User: \textcolor{teal}{on\_start()}, \textcolor{teal}{on\_stop()}.
+	\item TaskSet: \textcolor{teal}{on\_start()}, \textcolor{teal}{on\_stop()} cho từng nhóm task.
+\end{itemize}
+
+\medskip
+
+\textbf{Ví dụ login/logout:}
+
+\begin{verbatim}
+	class WebUser(HttpUser):
+	
+	def on_start(self):
+	self.client.post("/login", {"username": "test", "password": "secret"})
+	
+	def on_stop(self):
+	self.client.get("/logout")
+\end{verbatim}
+
+\medskip
+
+\textbf{Các pattern thường gặp:}
+
+\begin{itemize}
+	\item \textcolor{green}{HttpUser} cơ bản với nhiều task và trọng số khác nhau 
+	(index\_page vs about\_page).
+	\item User có \textcolor{green}{TaskSet} lồng nhau để mô phỏng browse + purchase flow.
+	\item \textcolor{green}{SequentialTaskSet} cho luồng checkout cố định.
+	\item Dùng multiple \textcolor{green}{HttpSession} trong một User để test nhiều service.
+	\item Dùng events + Semaphore (\textcolor{green}{spawning\_complete}) để đồng bộ hành vi giữa các user.
+\end{itemize}
+
+
+\subsubsection{\color{blue}{2.4.2.2.\ Load \textbf{Shaping} với \textbf{LoadTestShape}}}
+
+\paragraph{a) Tổng quan cơ chế Load Shaping}\leavevmode\\
+
+Load shaping điều khiển \textbf{tổng số virtual user} và \textbf{spawn rate} theo thời gian, để tạo các pattern như ramp-up, steady, spike, wave\ldots{}
 
 \vspace{1em}
-\textbf{Kiến trúc Master-Worker:} \texttt{Master process} điều phối và phân phối công việc đến các \texttt{worker processes}. Mỗi \texttt{worker} chạy độc lập và quản lý một nhóm người dùng ảo thông qua \textbf{greenlets (gevent)}, cho phép xử lý đồng thời hàng nghìn kết nối với overhead thấp.
+\noindent\rule{\linewidth}{0.4pt}
+\vspace{1em}
 
-\vspace{0.5em}
+\noindent Ở mức kiến trúc: \textbf{LoadTestShape} $\rightarrow$ Runner $\rightarrow$ \textbf{UsersDispatcher} $\rightarrow$ Worker Nodes $\rightarrow$ User Instances $\rightarrow$ Tasks.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.3\linewidth]{figures/phan2_4/2_4_2_2_a.png}
+\end{figure}
+
+\paragraph{b) Lớp \textbf{LoadTestShape}}
+
+\textbf{LoadTestShape} là \textit{abstract base class} mô tả đường cong tải:
+
 \begin{itemize}
-	\item \textbf{Greenlet (gevent):} Lightweight coroutine (tiến trình nhẹ) cho phép xử lý đồng thời hàng nghìn kết nối trên một thread mà không tốn nhiều bộ nhớ, tạo ra hiệu suất cao hơn so với multithreading truyền thống.
+	\item Thuộc tính chính: \textcolor{teal}{runner}, \textcolor{teal}{abstract}, \textcolor{teal}{use\_common\_options}.
+	\item API quan trọng:
+	\begin{itemize}
+		\item \textcolor{teal}{get\_run\_time()}, \textcolor{teal}{reset\_time()}, \textcolor{teal}{get\_current\_user\_count()}.
+		\item \textcolor{teal}{tick()} → trả về \textcolor{teal}{(user\_count, spawn\_rate)} hoặc 
+		\textcolor{teal}{(user\_count, spawn\_rate, user\_classes)}; trả \textcolor{teal}{None} để kết thúc test.
+	\end{itemize}
+\end{itemize}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.75\linewidth]{figures/phan2_4/2_4_2_2_b.png}
+	\caption{Cấu trúc lớp \texttt{LoadTestShape}}
+\end{figure}
+
+\paragraph{c) Các kiểu \textbf{Load Shape}}\leavevmode\\
+
+Locust cung cấp sẵn vài shape điển hình và cho phép định nghĩa custom:
+
+\begin{itemize}
+	\item \textbf{StepLoadShape} – tăng tải theo bậc.
+	\item \textbf{StagesShape} – nhiều stage, mỗi stage có \textcolor{teal}{user\_count} và \textcolor{teal}{duration} riêng.
+	\item \textbf{WaveShape} – tải dao động dạng sóng.
+	\item Custom shape – bất kỳ pattern lập trình được bằng Python.
+\end{itemize}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.85\linewidth]{figures/phan2_4/2_4_2_2_c.png}
+	\caption{LoadTestShape → StepLoadShape / StagesShape / WaveShape / Custom Shape}
+\end{figure}
+
+% -----------------------------------------------------------
+
+\paragraph{d) Chu kỳ \texttt{tick()} và tương tác với Runner}\leavevmode\\
+
+Mỗi \(\sim 1\) giây, Locust gọi \textcolor{teal}{tick()}:
+
+\begin{enumerate}
+	\item \textcolor{teal}{tick()} dựa trên \textcolor{teal}{get\_run\_time()} để tính  
+	\textcolor{teal}{(user\_count, spawn\_rate[, user\_classes])}.
 	
-	\item \textbf{Mô hình Greenlet (gevent):} Sử dụng coroutines để mô phỏng nhiều người dùng đồng thời trên một thread duy nhất. Khi một \texttt{greenlet} chờ response từ API, \texttt{gevent} tự động chuyển sang \texttt{greenlet} khác, tối ưu hóa việc sử dụng CPU.
-\end{itemize}
+	\item Runner nhận kết quả và tạo dispatch mới cho \textbf{UsersDispatcher}  
+	(phân phối cụ thể sang worker – xem mục 2.4.3).
+\end{enumerate}
 
-\vspace{0.5em}
-\textbf{Virtual User:} Người dùng ảo được mô phỏng bởi \texttt{greenlet} để tạo ra tải truy cập đồng thời vào hệ thống, mỗi \texttt{user} thực hiện các \texttt{task} theo kịch bản định sẵn.
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.85\linewidth]{figures/phan2_4/2_4_2_2_d.png}
+	\caption{LoadTestShape.tick() → Runner.new\_dispatch(...) → UsersDispatcher}
+\end{figure}
+
+\paragraph{e) Sử dụng \textbf{LoadTestShape}}
 
 \begin{itemize}
-	\item \textbf{Vòng đời của mỗi \textit{virtual user}}: Mỗi virtual user trải qua 3 giai đoạn: khởi tạo với phương thức \texttt{on\_start()}, thực thi vòng lặp tasks liên tục để gửi HTTP requests đến API đích, và kết thúc với \texttt{on\_stop()} khi test hoàn tất.
-	\item \textbf{Tasks Loop}: Vòng lặp thực thi liên tục các tác vụ (HTTP requests) để mô phỏng hành vi người dùng thực tế, bao gồm các hành động như đăng nhập, truy vấn dữ liệu, gửi form.
+	\item Tạo class kế thừa \textcolor{teal}{LoadTestShape}, override \textcolor{teal}{tick()}.
+	\item Đặt trong \textcolor{teal}{locustfile.py} hoặc file \textcolor{teal}{.py} được load cùng Locust.
+	\item Khi tìm thấy một subclass không \textcolor{teal}{abstract}, Locust sẽ dùng nó làm load shape chính, thay cho ramp-up mặc định.
 \end{itemize}
 
-\vspace{0.5em}
-\textbf{Thu thập và tổng hợp số liệu:} Mỗi worker gửi \textit{metrics} về master process thông qua message queue. Master tổng hợp dữ liệu từ tất cả workers thành module \textit{Stats Aggregation}, tính toán các chỉ số như:
+% ----------------------------------------------------------
+
+\subsubsection{\color{red}{2.4.3. Execution}}
+
+\subsubsection{\color{blue}{2.4.3.1. User Distribution với UsersDispatcher}}
+
+\paragraph{a) Vai trò}
+
+Trong chế độ distributed:
+
 \begin{itemize}
-	\item \textbf{request count} (số lượng requests),
-	\item \textbf{response times} (thời gian phản hồi),
-	\item \textbf{failures} (lỗi),
-	\item \textbf{RPS} (requests per second),
-	\item \textbf{percentiles} (phân vị: P50, P95, P99).
+	\item \textbf{LoadTestShape} quyết định tổng \textcolor{teal}{user\_count} và \textcolor{teal}{spawn\_rate}.
+	\item \textbf{UsersDispatcher} quyết định mỗi worker node chạy bao nhiêu user của từng \textbf{User Class}, tuân thủ \textcolor{teal}{spawn\_rate} và cân bằng tải.
 \end{itemize}
 
-\vspace{0.5em}
-\textbf{Hiển thị kết quả:} Master cung cấp 4 hình thức \textit{output} chính:
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.85\linewidth]{figures/phan2_4/2_4_3_1_a.png}
+\end{figure}
+
+\paragraph{b) Cấu trúc và API chính}\leavevmode\\
+
+Dữ liệu nội bộ:
+
 \begin{itemize}
-	\item \textbf{Web UI Dashboard}: Giao diện web hiển thị biểu đồ thời gian thực (\textit{real-time charts}), bảng thống kê chi tiết (\textit{statistics table}), bảng điều khiển (\textit{control panel}) để \texttt{start}/\texttt{stop} test, và khả năng tải xuống báo cáo.
-	\item \textbf{Test Reports}: Các báo cáo chi tiết dạng \textit{HTML report} và \textit{CSV statistics}, bao gồm phân bố thời gian phản hồi (\textit{response time distribution}) và nhật ký lỗi (\textit{failure logs}).
-	\item \textbf{Real-time Monitoring}: Giám sát trực tiếp số người dùng đang hoạt động (\textit{active users}), RPS hiện tại (\textit{current RPS}), tỷ lệ lỗi (\textit{error rate}), và xu hướng thời gian phản hồi (\textit{response time trends}).
-	\item \textbf{Stats Aggregation}: Tổng hợp tất cả số liệu thống kê để phân tích tổng quan hiệu suất hệ thống.
+	\item \textcolor{teal}{\_worker\_nodes: list[WorkerNode]} – danh sách worker.
+	\item \textcolor{teal}{\_user\_classes: list[type[User]], \_target\_user\_count, \_spawn\_rate}.
+	\item \textcolor{teal}{\_users\_on\_workers: dict} – map worker → \{UserClass: count\}.
 \end{itemize}
+
+API:
+
+\begin{itemize}
+	\item \textcolor{teal}{new\_dispatch(target\_user\_count, spawn\_rate, user\_classes)} – nhận “kế hoạch tải” mới từ Runner.
+	\item \textcolor{teal}{add\_worker(worker\_node)} / \textcolor{teal}{remove\_worker(worker\_node)} – cập nhật danh sách worker và trigger rebalance.
+\end{itemize}
+
+% ----------------------------------------------------------
+
+\paragraph{c) Dispatch cycle và spawn rate}\leavevmode\\
+
+UsersDispatcher chạy theo \textbf{dispatch cycle}:
+
+\begin{itemize}
+	\item Mỗi cycle: từ trạng thái user hiện tại đến trạng thái mục tiêu (ví dụ 0 → 100 user).
+	\item Cycle được chia thành nhiều \textbf{dispatch iteration}; mỗi iteration spawn/stop một batch user để đạt spawn rate mong muốn; giữa các iteration có khoảng chờ tương ứng.
+\end{itemize}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=1.1\linewidth]{figures/phan2_4/2_4_3_1_c.png}
+\end{figure}
+
+\paragraph{d) Thuật toán phân phối: Fixed-count vs Weighted users}\leavevmode\\
+
+Locust chia user thành hai nhóm:
+
+\begin{enumerate}
+	\item \textbf{Fixed-count users} (\textcolor{teal}{fixed\_count > 0}) – cần số lượng chính xác → spawn ưu tiên trước.
+	\item \textbf{Weighted users} – phần user còn lại được chia theo \textcolor{teal}{weight} của từng User Class.
+\end{enumerate}
+
+\textcolor{teal}{UsersDispatcher} dùng generator \textcolor{teal}{\_user\_gen()} để lần lượt chọn user từ hai nhóm này, sau đó phân bổ cho worker.  
+Thuật toán bên trong sử dụng \textbf{Kullback–Leibler divergence} để làm cho phân bố thực tế gần với phân bố mong muốn.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.6\linewidth]{figures/phan2_4/2_4_3_1_d.png}
+\end{figure}
+
+\paragraph{e) Chiến lược chọn worker}
+
+Chiến lược phân công user cho worker:
+
+\begin{enumerate}
+	\item Sort worker theo \textbf{ID} (đảm bảo determinism).
+	\item Gán \textbf{host index} cho các worker cùng host.
+	\item Sort theo \textcolor{teal}{(host\_index, worker\_id)} để ưu tiên dàn đều giữa các host.
+	\item ``Cycle through'' danh sách đó để gán từng user.
+\end{enumerate}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.6\linewidth]{figures/phan2_4/2_4_3_1_e.png}
+\end{figure}
