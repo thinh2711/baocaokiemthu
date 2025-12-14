@@ -1170,7 +1170,7 @@ Thuật toán bên trong sử dụng \textbf{Kullback–Leibler divergence} đ�
 	\includegraphics[width=0.6\linewidth]{figures/phan2_4/2_4_3_1_d.png}
 \end{figure}
 
-\paragraph{e) Chiến lược chọn worker}
+\paragraph{e) Chiến lược chọn worker}\leavevmode\\
 
 Chiến lược phân công user cho worker:
 
@@ -1185,3 +1185,612 @@ Chiến lược phân công user cho worker:
 	\centering
 	\includegraphics[width=0.6\linewidth]{figures/phan2_4/2_4_3_1_e.png}
 \end{figure}
+
+\paragraph{f) Rebalancing khi worker thay đổi}\leavevmode\\
+
+Khi thêm/bớt worker trong lúc test:
+
+\begin{enumerate}
+	\item Runner gọi \textcolor{teal}{add\_worker()} hoặc \textcolor{teal}{remove\_worker()}.
+	
+	\item UsersDispatcher chạy \textcolor{teal}{\_prepare\_rebalance()} + 
+	\textcolor{teal}{\_distribute\_users()} trong iteration kế tiếp.
+	
+	\item Phân bổ user được cập nhật, user được dịch chuyển sang tập worker mới 
+	mà vẫn bám theo target tổng thể.
+\end{enumerate}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.6\linewidth]{figures/phan2_4/2_4_3_1_f.png}
+\end{figure}
+
+\paragraph{g) Tích hợp với Runner và WorkerRunner}\leavevmode\\
+
+\textit{Trong distributed execution:}
+
+\begin{enumerate}
+	\item \textbf{MasterRunner} nhận kết quả \textcolor{teal}{tick()} từ LoadTestShape.
+	
+	\item Gọi \textcolor{teal}{UsersDispatcher.new\_dispatch(...)} để tính phân bổ user per worker.
+	
+	\item Gửi lệnh RPC \texttt{spawn\_users(user\_spec)} tới từng \textbf{WorkerRunner}.
+	
+	\item Mỗi WorkerRunner spawn/stop user theo \textcolor{teal}{user\_spec} và vẫn ghi log thống kê bình thường.
+\end{enumerate}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.6\linewidth]{figures/phan2_4/2_4_3_1_g.png}
+\end{figure}
+
+\paragraph{i) Sử dụng Custom Load Shape trong dự án}\leavevmode\\
+
+Để sử dụng một \textbf{custom load shape}, thực hiện các bước:
+
+\begin{enumerate}
+	\item Định nghĩa một class kế thừa \textcolor{teal}{LoadTestShape} trong \textcolor{teal}{locustfile.py} hoặc trong một module (\textcolor{teal}{.py}) riêng.
+	
+	\item Cài đặt phương thức \textcolor{teal}{tick()} sao cho nó trả về số lượng user và \textcolor{teal}{spawn\_rate} phù hợp theo từng thời điểm.
+	
+	\item Nếu shape nằm trong file riêng, khi chạy Locust hãy import file đó, ví dụ:
+\end{enumerate}
+
+\begin{verbatim}
+	locust -f locustfile.py,my_shape.py
+\end{verbatim}
+
+Khi Locust tìm thấy một subclass của \textcolor{teal}{LoadTestShape} \textbf{không được đánh dấu là abstract}, nó sẽ tự động sử dụng shape đó thay cho behavior ramp-up tuyến tính mặc định.
+
+% ---------------------------------------------------------------
+
+\subsubsection*{2.4.3.2. HTTP Clients}
+
+\paragraph{a) Mục đích và vị trí trong kiến trúc}
+
+Trong Locust, \textbf{HTTP clients} là thành phần chính dùng để gửi \textbf{HTTP request} từ các \textit{User instance} tới \textit{target system}.
+
+Hai client được dùng nhiều nhất là:
+
+\begin{itemize}
+	\item \textbf{HttpSession} – triển khai chuẩn, dựa trên thư viện \texttt{requests}.
+	\item \textbf{FastHttpSession} – triển khai hiệu năng cao, dựa trên \texttt{geventhttpclient}.
+\end{itemize}
+
+Các client này được bọc bởi các lớp người dùng:
+
+\begin{itemize}
+	\item \textbf{HttpUser} sử dụng \textcolor{teal}{HttpSession}.
+	\item \textbf{FastHttpUser} sử dụng \textcolor{teal}{FastHttpSession}.
+\end{itemize}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.6\linewidth]{figures/phan2_4/2_4_3_2_a1.png}
+\end{figure}
+
+Ở mức thấp hơn, \textcolor{teal}{HttpSession} và \textcolor{teal}{FastHttpSession} lại bọc quanh các lớp đến từ \textcolor{teal}{requests} và \textcolor{teal}{geventhttpclient}, đồng thời tích hợp với \textbf{ResponseContextManager} để báo cáo thống kê cho Locust.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=1\linewidth]{figures/phan2_4/2_4_3_2_a2.png}
+\end{figure}
+
+\paragraph{b) HttpSession – client mặc định}\leavevmode\\
+
+\textbf{HttpSession} là client HTTP mặc định của Locust, xây dựng trên thư viện \texttt{requests}.
+
+Đặc điểm chính:
+
+\begin{itemize}
+	\item Tận dụng toàn bộ khả năng của \texttt{requests} (cookie, session, redirect...).
+	\item API rất quen thuộc với lập trình viên Python.
+	\item Tự động gửi \textit{request event} cho hệ thống thống kê (\texttt{RequestStats}).
+	\item Dùng connection pooling qua \textcolor{teal}{urllib3.PoolManager} để tái sử dụng kết nối.
+\end{itemize}
+
+Phù hợp cho:
+
+\begin{itemize}
+	\item Bài test không quá nặng về throughput.
+	\item Trường hợp muốn tái sử dụng code/thư viện vốn viết trên \textcolor{teal}{requests}.
+\end{itemize}
+
+% -------------------------------------------------------------
+
+\paragraph{c) FastHttpSession – client hiệu năng cao}\leavevmode\\
+
+\textbf{FastHttpSession} là lựa chọn hiệu năng cao, dựa trên \texttt{geventhttpclient}.
+
+Đặc điểm chính:
+
+\begin{itemize}
+	\item Throughput có thể cao hơn khoảng 4–5 lần so với \texttt{HttpSession} trong best-case.
+	\item Tiêu tốn CPU ít hơn trên mỗi request.
+	\item API gần giống \textcolor{teal}{HttpSession}, dễ chuyển đổi.
+	\item Hỗ trợ cấu hình chi tiết:
+	\begin{itemize}
+		\item \textcolor{teal}{network\_timeout}, \textcolor{teal}{connection\_timeout}, \textcolor{teal}{max\_redirects}, \textcolor{teal}{max\_retries}, \textcolor{teal}{insecure} (bỏ verify SSL),
+		\item \textcolor{teal}{concurrency} – số request đồng thời tối đa trên mỗi user,
+		\item \texttt{client\_pool} – pool client tùy biến.
+	\end{itemize}
+	\item Có helper \textcolor{teal}{rest()} và các tiện ích cho test JSON/REST.
+\end{itemize}
+
+% -------------------------------------------------------------
+
+\paragraph{So sánh rất ngắn gọn (best-case, tham khảo):}
+
+\begin{center}
+	\begin{tabular}{|l|c|c|l|}
+		\hline
+		\textbf{Client} & \textbf{Throughput ước lượng} & \textbf{CPU usage} & \textbf{Tình huống phù hợp} \\
+		\hline
+		\textbf{HttpSession} & $\sim$4k req/s / core & Cao hơn & Test đơn giản, ưu tiên API quen thuộc \\
+		\hline
+		\textbf{FastHttpSession} & $\sim$16k req/s / core & Thấp hơn & Test tải nặng, môi trường bị giới hạn CPU \\
+		\hline
+	\end{tabular}
+\end{center}
+
+\medskip
+
+Thực tế sẽ thấp hơn tùy payload, network và logic task.
+
+\paragraph{d) Common API giữa hai client}
+
+Cả \textbf{HttpSession} và \textbf{FastHttpSession} dùng chung core API, nên ta có thể đổi giữa 
+\textcolor{teal}{HttpUser} và \textcolor{teal}{FastHttpUser} gần như không phải sửa code.
+
+Các method chính (HTTP verbs):
+
+\begin{itemize}
+	\item \textcolor{teal}{get(url, **kwargs)}
+	\item \textcolor{teal}{post(url, data=None, json=None, **kwargs)}
+	\item \textcolor{teal}{put(url, data=None, **kwargs)}
+	\item \textcolor{teal}{delete(url, **kwargs)}
+	\item \textcolor{teal}{head(url, **kwargs)}
+	\item \textcolor{teal}{patch(url, data=None, **kwargs)}
+	\item \textcolor{teal}{options(url, **kwargs)}
+	\item \textcolor{teal}{request(method, url, **kwargs)} – hàm tổng quát.
+\end{itemize}
+
+Một số keyword arguments quan trọng:
+
+\begin{itemize}
+	\item \textcolor{teal}{name} – tên hiển thị trong thống kê (dùng để group request).
+	\item \textcolor{teal}{catch\_response} – bật response validation với \textcolor{teal}{ResponseContextManager}.
+	\item \textcolor{teal}{headers}, \textcolor{teal}{auth}, \textcolor{teal}{params}, 
+	\textcolor{teal}{data}, \textcolor{teal}{json} – như trong \textcolor{teal}{requests}.
+	\item \textcolor{teal}{stream} – stream nội dung response (ảnh hưởng cách đo thời gian).
+	\item \textcolor{teal}{context} – đính kèm dữ liệu tuỳ ý vào thống kê.
+\end{itemize}
+
+
+\paragraph{e) Ví dụ sử dụng}\leavevmode\\
+
+Request cơ bản:
+
+\begin{lstlisting}[language=Python]
+	# GET
+	response = self.client.get("/api/users")
+	
+	# POST với JSON
+	response = self.client.post("/api/users", json={"name": "Test User"})
+\end{lstlisting}
+
+Response validation với \textcolor{teal}{catch\_response=True}:
+
+\begin{lstlisting}[language=Python]
+	with self.client.get("/api/status", catch_response=True) as response:
+	if response.status_code != 200:
+	response.failure("Status check failed")
+	elif "error" in response.json():
+	response.failure(f"Application error: {response.json()['error']}")
+	else:
+	response.success()
+\end{lstlisting}
+
+Request grouping với \textcolor{teal}{name}:
+
+\begin{lstlisting}[language=Python]
+	for user_id in range(1, 10):
+	self.client.get(f"/api/users/{user_id}", name="/api/users/[id]")
+\end{lstlisting}
+
+Các request trên sẽ gom chung trong thống kê dưới tên \textcolor{teal}{/api/users/[id]} thay vì tạo nhiều entry khác nhau.
+
+\paragraph{f) Cấu hình \textcolor{teal}{HttpUser} và \textcolor{teal}{FastHttpUser}} \leavevmode\\
+
+\textbf{\textcolor{teal}{HttpUser} + \textcolor{teal}{HttpSession}:}
+
+\begin{lstlisting}[language=Python]
+	from locust import HttpUser, task
+	
+	class MyUser(HttpUser):
+	host = "https://example.com"   # base URL
+	
+	# pool_manager: có thể gán một urllib3.PoolManager tùy biến nếu cần
+	pool_manager = None
+	
+	@task
+	def my_task(self):
+	self.client.get("/api/endpoint")
+\end{lstlisting}
+
+\textbf{\textcolor{teal}{FastHttpUser} + \textcolor{teal}{FastHttpSession}:}
+
+\begin{lstlisting}[language=Python]
+	from locust import task
+	from locust.contrib.fasthttp import FastHttpUser
+	
+	class MyUser(FastHttpUser):
+	host = "https://example.com"
+	
+	network_timeout   = 60.0
+	connection_timeout = 60.0
+	max_redirects = 30
+	max_retries = 0
+	insecure = True         # bỏ verify SSL (chỉ nên dùng trong môi trường test)
+	concurrency = 10        # tối đa 10 request đồng thời / user
+	client_pool = None      # pool client tùy chỉnh (nếu cần)
+	
+	@task
+	def my_task(self):
+	self.client.get("/api/endpoint")
+\end{lstlisting}
+
+% --------------------------------------------------------
+
+\paragraph{g) Lựa chọn client phù hợp}\leavevmode\\
+
+\textbf{Nên dùng \textcolor{teal}{HttpUser} / \textcolor{teal}{HttpSession} khi:}
+
+\begin{itemize}
+	\item Cần API giống hệt \textcolor{teal}{requests}, dễ đọc, dễ debug.
+	\item Bài test không yêu cầu throughput cực cao.
+	\item Đã có sẵn code sử dụng \textcolor{teal}{requests} và muốn reuse.
+\end{itemize}
+
+\textbf{Nên dùng \textcolor{teal}{FastHttpUser} / \textcolor{teal}{FastHttpSession} khi:}
+
+\begin{itemize}
+	\item Cần maximum throughput và môi trường bị giới hạn CPU.
+	\item Chạy test với số lượng kết nối đồng thời rất lớn.
+	\item Muốn tận dụng thêm các tính năng REST chuyên sâu của fasthttp.
+\end{itemize}
+
+Thường thường, có thể bắt đầu với \textcolor{teal}{HttpUser}; nếu thấy CPU load cao hoặc throughput không đủ, hãy chuyển sang \textcolor{teal}{FastHttpUser} mà hầu như không phải thay đổi logic task.
+
+\subsection*{\color{red}{2.4.4.\ Statistics \& Reporting}}
+
+\subsubsection*{\color{blue}{2.4.4.1 Overview}}
+
+Hệ thống \textbf{Statistics \& Reporting} là một trong các thành phần lõi của Locust, dùng để theo dõi hiệu năng của tất cả request trong quá trình chạy tải.
+
+Nó thu thập các số liệu như: \textbf{response time}, \textbf{request rate (RPS)}, số lần \textbf{failure}, \textbf{content length}, v.v… rồi cung cấp dữ liệu cho nhiều kênh:
+
+\begin{itemize}
+	\item Dashboard thời gian thực trên \textbf{Web UI}
+	\item Thống kê in ra \textbf{console}
+	\item Các file \textbf{CSV} để phân tích thêm
+	\item \textbf{HTML report} phục vụ tổng kết và chia sẻ kết quả
+\end{itemize}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=1\linewidth]{figures/phan2_4/2_4_4_1.png}
+	\caption{Luồng thu thập số liệu và báo cáo}
+\end{figure}
+
+\subsubsection*{\color{blue}{2.4.4.2 Core Statistics Components}}
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=1\linewidth]{figures/phan2_4/2_4_4_2.png}
+\end{figure}
+
+\subsubsection*{a.\ RequestStats}
+
+\textbf{RequestStats} là “kho trung tâm’’ lưu toàn bộ số liệu hiệu năng. Nó chứa:
+
+\begin{itemize}
+	\item Một \textbf{StatsEntry} tổng hợp (\textit{total}) cho toàn bộ hệ thống.
+	\item Tập các \textbf{StatsEntry} cho từng cặp \textit{(name, method)} cụ thể.
+	\item Tập các \textbf{StatsError} để ghi nhận lỗi.
+	\item \textbf{history} – danh sách snapshot thống kê theo thời gian (phục vụ CSV history, graph…)
+\end{itemize}
+
+Các phương thức chính:
+
+\begin{itemize}
+	\item \textcolor{teal}{\texttt{log\_request(method,\ name,\ response\_time,\ content\_length)}} – ghi nhận 1 request.
+	\item \textcolor{teal}{\texttt{log\_error(method,\ name,\ error)}} – ghi nhận 1 lỗi.
+	\item \textcolor{teal}{\texttt{reset\_all()}},\ \textcolor{teal}{\texttt{clear\_all()}} – reset/clear thống kê.
+	\item \textcolor{teal}{\texttt{serialize\_stats()}},\ \textcolor{teal}{\texttt{serialize\_errors()}} – tuần tự hóa để gửi giữa master/worker.
+\end{itemize}
+
+\medskip
+\hrule
+\medskip
+
+\subsubsection*{b.\ StatsEntry}
+
+\textbf{StatsEntry} biểu diễn thống kê cho \textit{một endpoint cụ thể} (ví dụ: GET /api/products).  
+Các trường quan trọng:
+
+\begin{itemize}
+	\item \textbf{num\_requests},\ \textbf{num\_failures} – số request / số lỗi.
+	\item \textbf{min\_response\_time}, \textbf{max\_response\_time}, \textbf{avg\_response\_time},\\
+	\textbf{median\_response\_time}.
+	\item Phân bố \textbf{response\_times} (dict: thời gian sau khi làm tròn → số lượng request).
+	\item Tổng \textbf{content\_length}.
+\end{itemize}
+
+\paragraph{} Nó cung cấp hàm:
+
+\begin{itemize}
+	\item \textcolor{teal}{\texttt{log(response\_time,\ content\_length)}} – cập nhật thống kê cho 1 request thành công.
+	\item \textcolor{teal}{\texttt{log\_error(error)}} – cập nhật thống kê lỗi.
+	\item \textcolor{teal}{\texttt{get\_response\_time\_percentile(percent)}} – tính percentile (50\%, 95\%, …).
+\end{itemize}
+
+\medskip
+
+Ví dụ (rút gọn):
+
+\textbf{StatsEntry:}
+
+\begin{itemize}
+	\item name: \texttt{"/api/products"}
+	\item method: \texttt{"GET"}
+	\item num\_requests: 1500
+	\item num\_failures: 15
+	\item min\_response\_time: 45
+	\item max\_response\_time: 2300
+	\item median\_response\_time: 125
+	\item avg\_response\_time: 145.3
+\end{itemize}
+
+\medskip
+\subsubsection*{c.\ StatsError}
+
+\textbf{StatsError} lưu thông tin về lỗi theo bộ khóa \textit{(method, name, error\_message)}:
+
+\begin{itemize}
+	\item \textbf{method, name} – HTTP method và tên request.
+	\item \textbf{error} – message hoặc Exception.
+	\item \textbf{occurrences} – số lần xuất hiện.
+\end{itemize}
+
+Dùng để tổng hợp các loại lỗi phổ biến trong test.
+
+\subsubsection*{\color{blue}{2.4.4.3 Statistics Collection Mechanism}}
+
+\paragraph{a.\ Event-Driven Collection} \leavevmode\\
+
+Cơ chế thu thập số liệu dựa trên \textbf{Event System}:
+
+\begin{enumerate}
+	\item Mỗi khi HTTP client hoàn thành request, nó fire event 
+	\textcolor{teal}{\texttt{"request"}}.
+	
+	\item Listener của event này gọi 
+	\textcolor{teal}{\texttt{RequestStats.log\_request(...)}} 
+	để cập nhật \textbf{StatsEntry}.
+	
+	\item Nếu xảy ra lỗi hoặc 
+	\textcolor{teal}{\texttt{response.failure()}} 
+	sẽ fire event 
+	\textcolor{teal}{\texttt{"request\_failure"}};  
+	listener tương ứng gọi 
+	\textcolor{teal}{\texttt{log\_error(...)}}.
+\end{enumerate}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.90\linewidth]{figures/phan2_4/2_4_4_3.png}
+	\caption{Trình tự sự kiện từ User Task → HTTP Client → Event System → RequestStats}
+\end{figure}
+
+\paragraph{b.\ Response Time Processing}\leavevmode\\
+
+Để tiết kiệm bộ nhớ mà vẫn đủ chính xác, Locust bucket response time:
+
+\begin{itemize}
+	\item \textless{} 100 ms: làm tròn đến \textbf{1 ms}
+	\item 100--1000 ms: làm tròn đến \textbf{10 ms}
+	\item 1000--10000 ms: làm tròn đến \textbf{100 ms}
+	\item \textgreater{} 10000 ms: làm tròn đến \textbf{1000 ms}
+\end{itemize}
+
+Việc này giúp giữ kích thước 
+\textcolor{teal}{\texttt{response\_times}} nhỏ nhưng vẫn phân tích percentile tốt.
+
+\paragraph{c.\ Distributed Statistics Collection} \leavevmode\\
+
+Trong \textbf{distributed mode}:
+
+\begin{enumerate}
+	\item Mỗi worker giữ 
+	\textcolor{teal}{\texttt{RequestStats}} cục bộ và định kỳ serialize 
+	rồi gửi về master qua RPC.
+	
+	\item Master dùng 
+	\textcolor{teal}{\texttt{extend()}} trên 
+	\textcolor{teal}{\texttt{StatsEntry}} để gộp số liệu từ tất cả workers.
+	
+	\item Master là nơi giữ view đầy đủ → cung cấp dữ liệu cho Web UI, console, CSV/HTML.
+\end{enumerate}
+
+\subsubsection*{\color{blue}{2.4.4.4 Reporting Mechanisms}}
+
+\paragraph{a.\ Console Output}\leavevmode\\
+
+Trong quá trình chạy, Locust in ra bảng thống kê dạng text:
+
+\begin{itemize}
+	\item Số request, số lỗi
+	\item Avg, Min, Max, Med
+	\item req/s, failures/s cho từng endpoint và dòng Aggregated.
+\end{itemize}
+
+Giúp quan sát nhanh mà không cần mở Web UI.
+
+\paragraph{b.\ Web UI Dashboard} \leavevmode\\
+
+Web UI truy cập các endpoint như:
+
+\begin{itemize}
+	\item \textcolor{teal}{\texttt{/stats/requests}} -- thống kê request hiện tại
+	\item \textcolor{teal}{\texttt{/stats/failures}} -- danh sách lỗi
+	\item \textcolor{teal}{\texttt{/exceptions}} -- các Python exception
+\end{itemize}
+
+Frontend định kỳ poll các endpoint này để cập nhật bảng, graph,
+đồng thời cung cấp nút Download data (CSV/HTML).
+
+\paragraph{c.\ CSV Reports} \leavevmode\\
+
+Khi chạy Locust với 
+\textcolor{teal}{\texttt{--csv=prefix}}, 
+hệ thống sẽ tạo các file:
+
+\begin{itemize}
+	\item \textcolor{teal}{\texttt{prefix\_stats.csv}} -- thống kê tổng hợp từng endpoint
+	\item \textcolor{teal}{\texttt{prefix\_stats\_history.csv}} -- lịch sử thống kê theo thời gian
+	\item \textcolor{teal}{\texttt{prefix\_failures.csv}} -- chi tiết lỗi
+	\item \textcolor{teal}{\texttt{prefix\_exceptions.csv}} -- chi tiết exception
+\end{itemize}
+
+Chu kỳ ghi CSV có thể cấu hình:
+
+\begin{verbatim}
+	import locust.stats
+	locust.stats.CSV_STATS_INTERVAL_SEC = 5   # mặc định 1 giây
+\end{verbatim}
+
+\paragraph{d.\ HTML Reports} \leavevmode\\
+
+Option 
+\textcolor{teal}{\texttt{--html=report.html}} 
+cho phép xuất một \textbf{HTML report} tổng hợp:
+
+\begin{itemize}
+	\item Bảng thống kê
+	\item Biểu đồ response time / RPS theo thời gian
+	\item Thông tin failure, tỉ lệ task, v.v.
+\end{itemize}
+
+Có thể tải trực tiếp từ Web UI hoặc qua dòng lệnh.
+
+\subsection*{\color{blue}{2.4.4.5 Statistics Analysis}}
+
+\paragraph{a.\ Các chỉ số chính}\leavevmode\\
+
+Một số metric quan trọng thường xem:
+
+\begin{itemize}
+	\item \textbf{RPS (Requests per Second)} -- tốc độ xử lý request.
+	\item \textbf{Average Response Time} -- thời gian xử lý trung bình.
+	\item \textbf{Median / Percentiles} -- P50, P95, P99 đánh giá trải nghiệm người dùng.
+	\item \textbf{Failure Rate} -- tỉ lệ lỗi trên tổng request.
+	\item \textbf{Current RPS} -- RPS trong cửa sổ thời gian gần nhất (\textless12s).
+\end{itemize}
+
+\paragraph{b.\ Percentile Calculation}\leavevmode\\
+
+\textcolor{teal}{\texttt{StatsEntry.get\_response\_time\_percentile(percent)}} 
+tính percentile từ phân bố 
+\textcolor{teal}{\texttt{response\_times}}.
+
+Mặc định Locust báo cáo một tập percentile như: 
+\textbf{50\%}, \textbf{75\%}, \textbf{90\%}, \textbf{95\%}, \textbf{99\%}, \textbf{99.9\%}…
+
+Có thể tuỳ chỉnh:
+
+\begin{verbatim}
+	import locust.stats
+	
+	locust.stats.PERCENTILES_TO_REPORT = [0.50, 0.75, 0.90, 0.95, 0.99]
+\end{verbatim}
+
+\paragraph{c.\ Full History CSV Output}\leavevmode\\
+
+Để ghi \textbf{full history} cho từng endpoint (không chỉ dòng aggregated) vào  
+\textcolor{teal}{\texttt{\_stats\_history.csv}}, dùng flag:
+
+\begin{verbatim}
+	locust -f locustfile.py --csv=test_results --csv-full-history
+\end{verbatim}
+
+Mỗi lần ghi stats, tất cả entry (và dòng thống kê) sẽ được append,  
+giúp phân tích tốc độ theo thời gian chi tiết hơn.
+
+\subsubsection*{\color{blue}{2.4.4.6 Practical Examples}}
+
+\paragraph{a.\ Truy cập thống kê bằng code} \leavevmode\\
+
+Có thể đọc thống kê trực tiếp từ 
+\textcolor{teal}{\texttt{environment.stats}}  
+trong các hook, ví dụ 
+\textcolor{teal}{\texttt{test\_stop}}:
+
+\begin{verbatim}
+	from locust import events
+	
+	@events.test_stop.add_listener
+	def on_test_stop(environment, **kwargs):
+	stats = environment.stats
+	
+	# Thống kê tổng
+	print(f"Total requests: {stats.total.num_requests}")
+	print(f"Failed requests: {stats.total.num_failures}")
+	print(f"Average response time: {stats.total.avg_response_time} ms")
+	
+	# Thống kê cho một endpoint cụ thể
+	endpoint_stats = stats.get("/api/products", "GET")
+	print("Endpoint 95th percentile: "
+	f"{endpoint_stats.get_response_time_percentile(0.95)} ms")
+	
+	# Thông tin lỗi
+	for error in stats.errors.values():
+	print(f"Error: {error.to_name()} occurred {error.occurrences} times")
+\end{verbatim}
+
+\paragraph{b.\ Gợi ý đọc \& diễn giải số liệu} \leavevmode\\
+
+Khi phân tích báo cáo:
+
+\begin{enumerate}
+	\item So sánh \textbf{Average vs Percentiles}  
+	Các outlier có thể làm lệch average; P95/P99 phản ánh trải nghiệm tệ nhất mà user vẫn thường gặp.
+	
+	\item Nhìn phân bố \textbf{response time}  
+	Đuôi dài (long tail) có thể chỉ ra vấn đề về DB, cache, GC,…
+	
+	\item Kiểm tra lỗi  
+	Phân biệt lỗi ứng dụng (HTTP 5xx, logic) với lỗi timeout/network.
+	
+	\item Theo dõi quan hệ \textbf{RPS ↔ response time}  
+	Khi tải tăng tới một ngưỡng, response time bắt đầu tăng rất mạnh → dấu hiệu giới hạn khả năng hệ thống.
+\end{enumerate}
+
+\subsubsection*{\color{blue}{2.4.4.7 Integration with Other Locust Systems}}
+
+\begin{center}
+	\includegraphics[width=0.95\linewidth]{figures/phan2_4/2_4_4_7.png}
+\end{center}
+
+Hệ thống statistics gắn chặt với các thành phần khác của Locust:
+
+\begin{itemize}
+	\item \textcolor{teal}{\texttt{Environment}} giữ reference tới 
+	\textcolor{teal}{\texttt{RequestStats}}.
+	
+	\item HTTP clients gửi \textcolor{teal}{\texttt{events}} cập nhật thống kê.
+	
+	\item \textcolor{teal}{\texttt{Runner}} điều khiển vòng đời test, đồng thời trigger việc reset/ghi stats.
+	
+	\item Web UI, console reporter, CSV writer, HTML reporter…  
+	đều đọc dữ liệu từ \textcolor{teal}{\texttt{RequestStats}}.
+\end{itemize}
